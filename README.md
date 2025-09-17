@@ -103,23 +103,19 @@ POST /api/v1/announcements/summarize
 }
 ```
 
+**说明**：
+- 基于 `/api/v1/announcements/{stock_code}` 获取公告数据
+- 使用百炼大模型 Qwen3 进行智能总结（预留接口）
+- 自动获取该股票过去10天的公告并进行总结
+- 总结字数限制在500字内
+
 **响应示例**：
 ```json
 {
     "success": true,
     "data": {
         "summary": "【AI总结功能预留】针对股票：000001的公告总结",
-        "key_points": [
-            "• 关键要点1（待AI生成）",
-            "• 关键要点2（待AI生成）",
-            "• 关键要点3（待AI生成）"
-        ],
-        "impact_analysis": {
-            "positive_impact": "正面影响分析（待AI生成）",
-            "negative_impact": "负面影响分析（待AI生成）",
-            "neutral_impact": "中性影响分析（待AI生成）"
-        },
-        "investment_suggestion": "投资建议（待AI生成，500字内）",
+        "content": "基于该股票过去10天的公告内容，通过百炼大模型Qwen3分析得出：该公司近期发布了多项重要公告，包括业务发展、财务状况等关键信息。具体分析内容将在AI模型集成后提供详细的结构化总结。（当前为预留接口，500字内）",
         "word_count": 0,
         "model_info": {
             "model": "qwen3",
