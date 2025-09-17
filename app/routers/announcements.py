@@ -9,15 +9,12 @@ router = APIRouter()
 
 @router.get("/announcements/{stock_code}", response_model=BaseResponse)
 async def get_stock_announcements(
-    stock_code: str,
-    date: Optional[str] = Query(None, description="指定日期 YYYY-MM-DD，默认今天")
+    stock_code: str
 ):
-    """获取单个股票当天的公告列表"""
+    """获取单个股票过去10天的公告列表"""
     try:
-        announcements = await announcement_service.get_announcements(
-            stock_code, date
-        )
-        return BaseResponse(data=announcements, message="调用成功")
+        announcements = await announcement_service.get_announcements(stock_code)
+        return BaseResponse(data=announcements.model_dump(), message="获取公告成功")
     except StockAPIException as e:
         raise HTTPException(status_code=400, detail=e.message)
     except Exception as e:
@@ -47,9 +44,7 @@ async def webhook_announcements(request: WebhookRequest):
     try:
         results = []
         for stock_code in request.stock_codes:
-            announcements = await announcement_service.get_announcements(
-                stock_code, request.date, 1, 50
-            )
+            announcements = await announcement_service.get_announcements(stock_code)
             results.append({
                 "stock_code": stock_code,
                 "announcements": announcements.model_dump()
