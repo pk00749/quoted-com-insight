@@ -61,12 +61,12 @@ GET /api/v1/announcements/{stock_code}
 
 **参数**：
 - `stock_code`: 股票代码（必填）
-- `date`: 指定日期 YYYYMMDD（可选，默认今天）
 
 **说明**：
 - 使用 AKShare 的 `stock_notice_report` 接口获取数据
 - 数据来源：各大证券交易所官方公告
-- 支持日级查询，获取指定日期的公告信息
+- 自动获取过去10天的公告信息
+- 返回公告详情链接列表
 
 **响应示例**：
 ```json
