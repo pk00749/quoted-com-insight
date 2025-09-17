@@ -19,10 +19,8 @@ class AnnouncementService:
     async def get_announcements(
         self,
         stock_code: str,
-        date: Optional[str] = None,
-        page: int = 1,
-        size: int = 20
-    ) -> AnnouncementList:
+        date: Optional[str] = None
+    ) -> str:
         """获取单个股票当天的公告列表"""
         try:
             # 设置默认日期为当天
@@ -40,34 +38,9 @@ class AnnouncementService:
             df = await loop.run_in_executor(None, self._get_stock_notice_data, stock_code, date)
 
             if df is None or df.empty:
-                return AnnouncementList(announcements=[], total=0, page=page, size=size)
+                return []
 
-            # 转换为公告对象列表
-            announcements = []
-            for _, row in df.iterrows():
-                announcement = Announcement(
-                    stock_code=row.get('代码', ''),
-                    stock_name=row.get('名称', ''),
-                    title=row.get('公告标题', ''),
-                    category=row.get('公告类型', '其他'),
-                    publish_date=self._parse_date(row.get('公告日期', date)),
-                    url=row.get('网址', '')
-                )
-                announcements.append(announcement)
-
-            # 分页处理
-            total = len(announcements)
-            start_idx = (page - 1) * size
-            end_idx = start_idx + size
-            paginated_announcements = announcements[start_idx:end_idx]
-
-            return AnnouncementList(
-                announcements=paginated_announcements,
-                total=total,
-                page=page,
-                size=size
-            )
-
+            return str(df['网址'].tolist())
         except Exception as e:
             logger.error(f"获取公告失败: {stock_code}, 错误: {str(e)}")
             raise StockAPIException(f"获取股票公告失败: {str(e)}", "FETCH_ANNOUNCEMENTS_ERROR")

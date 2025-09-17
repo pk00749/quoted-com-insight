@@ -1,28 +1,54 @@
 # 股票公告信息API服务
 
-基于FastAPI + akshare构建的股票公告信息API服务，专为n8n工作流优化，支持百炼大模型智能总结。
+基于 FastAPI + AKShare 开发的股票公告信息API服务，专注于提供A股市场的公告数据查询和AI智能总结功能。
 
-## 📋 项目概述
+## 🚀 功能特性
 
-专注于股票公告信息获取和处理的API服务，提供实时数据获取、智能总结和n8n集成功能。
-
-## ✨ 核心特性
-
-- 🚀 **高性能异步**: 基于FastAPI的异步API架构
-- 📊 **实时数据**: 集成akshare库获取实时股票公告数据
-- 🤖 **AI总结**: 支持百炼qwen3智能总结（预留接口，500字限制）
-- 🔗 **n8n集成**: 优化的Webhook接口，完美适配n8n工作流
-- 📈 **日级数据**: 支持日期范围查询，无需本地存储
-- 🎯 **单股查询**: 支持单个股票代码查询
-- 🔧 **结构化输出**: 要点提取 + 影响分析
+- **公告数据获取**：使用 AKShare 的 `stock_notice_report` 接口获取股票公告
+- **日级数据**：支持查询指定日期的股票公告信息
+- **实时获取**：无持久化存储，每次请求实时获取最新数据
+- **AI智能总结**：集成百炼大模型 Qwen3 进行公告智能总结（预留接口）
+- **Webhook支持**：为 n8n 工作流优化的 Webhook 接口
+- **RESTful API**：标准的 REST 风格接口设计
 
 ## 🛠️ 技术栈
 
-- **后端框架**: FastAPI
-- **数据源**: akshare
-- **AI模型**: 百炼大模型qwen3（预留）
-- **容器化**: Docker
-- **测试**: pytest
+- **框架**：FastAPI
+- **数据源**：AKShare
+- **AI模型**：百炼大模型 Qwen3（预留）
+- **语言**：Python 3.8+
+
+## 📦 安装与运行
+
+### 环境要求
+- Python 3.8+
+- pip
+
+### 安装依赖
+```bash
+pip install -r requirements.txt
+```
+
+### 启动服务
+```bash
+# 开发模式
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 或使用启动脚本
+bash start.sh
+```
+
+### Docker 部署
+```bash
+# 构建镜像
+docker build -t stock-announcement-api .
+
+# 运行容器
+docker run -p 8000:8000 stock-announcement-api
+
+# 或使用 docker-compose
+docker-compose up -d
+```
 
 ## 📚 API接口文档
 
@@ -34,11 +60,13 @@ GET /api/v1/announcements/{stock_code}
 ```
 
 **参数**：
-- `stock_code`: 股票代码（支持多种格式：000001、000001.SZ等）
-- `start_date`: 开始日期 YYYY-MM-DD（可选，默认最近30天）
-- `end_date`: 结束日期 YYYY-MM-DD（可选，默认今天）
-- `page`: 页码（可选，默认1）
-- `size`: 每页大小（可选，默认20，最大100）
+- `stock_code`: 股票代码（必填）
+- `date`: 指定日期 YYYY-MM-DD（可选，默认今天）
+
+**说明**：
+- 使用 AKShare 的 `stock_notice_report` 接口获取数据
+- 数据来源：各大证券交易所官方公告
+- 支持日级查询，获取指定日期的公告信息
 
 **响应示例**：
 ```json
@@ -47,19 +75,15 @@ GET /api/v1/announcements/{stock_code}
     "data": {
         "announcements": [
             {
-                "id": "000001_001",
                 "stock_code": "000001",
                 "stock_name": "平安银行",
-                "title": "关于董事会决议的公告",
-                "publish_date": "2025-09-17",
-                "category": "董事会决议",
-                "url": "https://...",
-                "content": "公告摘要...",
-                "importance": "high",
-                "keywords": ["董事会", "决议"]
+                "title": "关于召开2024年第三次临时股东大会的通知",
+                "category": "临时股东大会",
+                "publish_date": "2024-09-17",
+                "url": "http://static.cninfo.com.cn/finalpage/..."
             }
         ],
-        "total": 15,
+        "total": 1,
         "page": 1,
         "size": 20
     },
@@ -67,17 +91,7 @@ GET /api/v1/announcements/{stock_code}
 }
 ```
 
-#### 2. 获取最新公告
-```http
-GET /api/v1/announcements/latest
-```
-
-**参数**：
-- `date`: 指定日期 YYYY-MM-DD（可选，默认今天）
-- `limit`: 返回数量限制（可选，默认50，最大200）
-- `category`: 公告类别筛选（可选）
-
-#### 3. AI智能总结公告
+#### 2. AI智能总结公告
 ```http
 POST /api/v1/announcements/summarize
 ```
@@ -85,11 +99,7 @@ POST /api/v1/announcements/summarize
 **请求体**：
 ```json
 {
-    "announcement": {
-        "title": "公告标题",
-        "content": "公告内容",
-        "stock_code": "000001"
-    }
+    "stock_code": "000001"
 }
 ```
 
@@ -98,30 +108,30 @@ POST /api/v1/announcements/summarize
 {
     "success": true,
     "data": {
-        "summary": "AI总结内容（500字内）",
+        "summary": "【AI总结功能预留】针对股票：000001的公告总结",
         "key_points": [
-            "• 关键要点1",
-            "• 关键要点2",
-            "• 关键要点3"
+            "• 关键要点1（待AI生成）",
+            "• 关键要点2（待AI生成）",
+            "• 关键要点3（待AI生成）"
         ],
         "impact_analysis": {
-            "positive_impact": "正面影响分析",
-            "negative_impact": "负面影响分析",
-            "neutral_impact": "中性影响分析"
+            "positive_impact": "正面影响分析（待AI生成）",
+            "negative_impact": "负面影响分析（待AI生成）",
+            "neutral_impact": "中性影响分析（待AI生成）"
         },
-        "investment_suggestion": "投资建议",
-        "word_count": 456,
+        "investment_suggestion": "投资建议（待AI生成，500字内）",
+        "word_count": 0,
         "model_info": {
             "model": "qwen3",
             "provider": "百炼大模型",
             "status": "接口预留"
         }
     },
-    "message": "AI总结完成"
+    "message": "AI总结完成（当前为预留接口）"
 }
 ```
 
-#### 4. n8n专用Webhook接口
+#### 3. Webhook接口（n8n专用）
 ```http
 POST /api/v1/webhook/announcements
 ```
@@ -130,129 +140,160 @@ POST /api/v1/webhook/announcements
 ```json
 {
     "stock_codes": ["000001", "000002"],
-    "date": "2025-09-17"
+    "date": "2024-09-17"
 }
 ```
 
-#### 5. 健康检查（n8n专用）
-```http
-GET /api/v1/health
+**响应示例**：
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "stock_code": "000001",
+            "announcements": {
+                "announcements": [...],
+                "total": 5,
+                "page": 1,
+                "size": 50
+            }
+        }
+    ],
+    "message": "Webhook处理成功，共处理2只股票"
+}
 ```
 
-## 🚀 快速开始
+### 系统接口
+
+#### 健康检查
+```http
+GET /health
+```
+
+#### 系统信息
+```http
+GET /api/v1/system/info
+```
+
+## 🔧 配置说明
+
+### 环境变量
+创建 `.env` 文件：
+```env
+# 服务配置
+APP_NAME=股票公告API服务
+APP_VERSION=1.0.0
+DEBUG=true
+
+# API配置
+API_V1_STR=/api/v1
+
+# 日志配置
+LOG_LEVEL=INFO
+```
+
+## 📖 数据源说明
+
+### AKShare stock_notice_report 接口
+
+本服务使用 AKShare 的 `stock_notice_report` 接口获取股票公告数据：
+
+- **接口名称**：`ak.stock_notice_report(symbol="财务报告", date="20240917")`
+- **数据来源**：巨潮资讯网
+- **更新频率**：实时更新
+- **数据覆盖**：沪深A股市场
+
+**返回字段说明**：
+- `代码`: 股票代码
+- `名称`: 股票简称
+- `公告标题`: 公告标题
+- `公告类型`: 公告分类
+- `公告日期`: 发布日期
+- `网址`: 公告详情链接
+
+## 🔄 使用场景
+
+1. **财经媒体**：自动获取和分析股票公告
+2. **量化投资**：公告数据驱动的投资策略
+3. **风险监控**：重要公告的实时监控
+4. **数据分析**：股票公告的统计分析
+5. **工作流自动化**：结合 n8n 构建自动化数据处理流程
+
+## 🤝 开发指南
+
+### 项目结构
+```
+quoted-com-insight/
+├── app/
+│   ├── core/           # 核心配置和异常处理
+│   ├── models.py       # 数据模型定义
+│   ├── routers/        # API路由
+│   ├── services/       # 业务逻辑服务
+│   └── main.py         # 应用入口
+├── tests/              # 测试文件
+├── requirements.txt    # 依赖包
+├── Dockerfile         # Docker配置
+└── README.md          # 项目文档
+```
 
 ### 本地开发
 
-1. **克隆项目**：
+1. 克隆项目：
 ```bash
 git clone <repository-url>
 cd quoted-com-insight
 ```
 
-2. **安装依赖**：
+2. 创建虚拟环境：
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或
+venv\Scripts\activate     # Windows
+```
+
+3. 安装依赖：
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **启动服务**：
+4. 启动开发服务器：
 ```bash
-python -m app.main
+uvicorn app.main:app --reload
 ```
 
-4. **访问文档**：
-- API文档: http://localhost:8000/docs
-- ReDoc文档: http://localhost:8000/redoc
+5. 访问 API 文档：
+   - Swagger UI: http://localhost:8000/docs
+   - ReDoc: http://localhost:8000/redoc
 
-### Docker部署
-
-```bash
-# 构建镜像
-docker build -t stock-announcement-api .
-
-# 运行容器
-docker run -p 8000:8000 stock-announcement-api
-```
-
-### Docker Compose
-
-```bash
-docker-compose up -d
-```
-
-## 🔗 n8n集成指南
-
-### 1. 健康检查节点
-```
-GET http://your-api-host:8000/api/v1/health
-```
-
-### 2. 获取股票公告
-```
-GET http://your-api-host:8000/api/v1/announcements/000001?start_date=2025-09-01&end_date=2025-09-17
-```
-
-### 3. Webhook批量处理
-```
-POST http://your-api-host:8000/api/v1/webhook/announcements
-Content-Type: application/json
-
-{
-    "stock_codes": ["000001", "000002", "600036"],
-    "date": "2025-09-17"
-}
-```
-
-## 📊 数据特性
-
-- **实时性**: 直接从akshare获取最新数据，无本地缓存
-- **准确性**: 基于权威数据源的公告信息
-- **完整性**: 包含公告标题、内容、分类、链接等完整信息
-- **智能化**: AI自动判断公告重要性和提取关键词
-
-## 🔧 配置说明
-
-主要配置在 `app/core/config.py` 中：
-
-```python
-class Settings:
-    app_name: str = "股票公告信息API服务"
-    version: str = "1.0.0"
-    # 其他配置...
-```
-
-## 🧪 测试
-
+### 测试
 ```bash
 # 运行测试
 pytest
 
 # 运行特定测试
-pytest tests/test_quoted_com_insight_api.py -v
+pytest tests/test_akshare_api.py
 ```
-
-## 📈 扩展规划
-
-- ✅ **第一阶段**: 公告信息服务（已完成）
-- 🔄 **第二阶段**: 百炼大模型集成
-- 📋 **后续阶段**: 扩展其他股票信息类型
-
-## ⚠️ 注意事项
-
-1. **数据依赖**: 服务依赖akshare库和相关数据源的可用性
-2. **请求频率**: 建议控制请求频率，避免对数据源造成压力
-3. **错误处理**: 服务包含完善的错误处理和重试机制
-4. **AI功能**: 当前AI总结为预留接口，待后续集成
 
 ## 📝 更新日志
 
-### v1.0.0 (2025-09-17)
-- ✅ 完成基础架构搭建
-- ✅ 集成akshare数据源
-- ✅ 实现公告列表获取
-- ✅ 添加n8n专用接口
-- ✅ 预留AI总结接口
-- ✅ 完善错误处理和日志
+### v1.0.0 (2024-09-17)
+- 初始版本发布
+- 支持股票公告数据获取
+- 集成 AKShare stock_notice_report 接口
+- 提供 Webhook 接口支持 n8n
+- 预留 AI 智能总结功能
 
-## 📞 支持
+## 🔗 相关链接
 
-如有问题或建议，请提交Issue或联系开发团队。
+- [AKShare 文档](https://akshare.akfamily.xyz/)
+- [FastAPI 官网](https://fastapi.tiangolo.com/)
+- [百炼大模型](https://bailian.aliyun.com/)
+
+## 📄 许可证
+
+MIT License
+
+## 🙋‍♂️ 联系我们
+
+如有问题或建议，请提交 Issue 或 Pull Request。

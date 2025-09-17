@@ -10,16 +10,14 @@ router = APIRouter()
 @router.get("/announcements/{stock_code}", response_model=BaseResponse)
 async def get_stock_announcements(
     stock_code: str,
-    date: Optional[str] = Query(None, description="指定日期 YYYY-MM-DD，默认今天"),
-    page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(20, ge=1, le=100, description="每页大小")
+    date: Optional[str] = Query(None, description="指定日期 YYYY-MM-DD，默认今天")
 ):
     """获取单个股票当天的公告列表"""
     try:
         announcements = await announcement_service.get_announcements(
-            stock_code, date, page, size
+            stock_code, date
         )
-        return BaseResponse(data=announcements.model_dump(), message="获取公告成功")
+        return BaseResponse(data=announcements, message="获取公告成功")
     except StockAPIException as e:
         raise HTTPException(status_code=400, detail=e.message)
     except Exception as e:

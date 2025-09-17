@@ -24,13 +24,6 @@ class Announcement(BaseModel):
     category: str = Field(..., description="公告类型")
     url: Optional[str] = Field(None, description="网址")
 
-class AnnouncementList(BaseModel):
-    """公告列表"""
-    announcements: List[Announcement]
-    total: int = Field(..., description="总数")
-    page: int = Field(1, description="页码")
-    size: int = Field(20, description="每页大小")
-
 class AnnouncementSummary(BaseModel):
     """公告智能总结"""
     summary: str = Field(..., description="智能总结内容（500字以内）")
