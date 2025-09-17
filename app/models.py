@@ -21,14 +21,11 @@ class Announcement(BaseModel):
     """公告信息"""
     id: str = Field(..., description="公告ID")
     stock_code: str = Field(..., description="股票代码")
-    stock_name: str = Field(..., description="股票名称")
+    stock_name: str = Field(..., description="名称")
     title: str = Field(..., description="公告标题")
     publish_date: str = Field(..., description="公告日期")
     category: str = Field(..., description="公告类型")
     url: Optional[str] = Field(None, description="公告链接")
-    content: str = Field(default="", description="公告内容")
-    importance: str = Field(default="medium", description="重要程度")
-    keywords: List[str] = Field(default_factory=list, description="关键词")
 
 class AnnouncementList(BaseModel):
     """公告列表"""

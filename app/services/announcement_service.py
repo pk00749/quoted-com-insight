@@ -95,14 +95,11 @@ class AnnouncementService:
             announcement = Announcement(
                 id=f"{stock_code}_{row.get('序号', len(announcements))}_{row.get('公告日期', '')}",
                 stock_code=stock_code,
-                stock_name=row.get('证券简称', ''),
+                stock_name=row.get('名称', ''),
                 title=row.get('公告标题', ''),
                 publish_date=self._parse_date(row.get('公告日期')),
                 category=row.get('公告类型', '其他'),
-                url=row.get('网址', ''),
-                content='',  # 不获取正文内容
-                importance="medium",
-                keywords=[]
+                url=row.get('网址', '')
             )
             announcements.append(announcement)
 
