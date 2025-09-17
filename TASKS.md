@@ -16,13 +16,13 @@
 **接口**: `GET /api/v1/announcements/{stock_code}`
 
 ### 📋 需求描述
-- 获取单个股票过去10天的公告链接列表
+- 获取单个股票过去10天的公告信息
 - 使用 AKShare 的 `stock_notice_report` 接口
-- 返回简洁的公告链接数组
+- 返回完整的公告对象列表（不获取正文内容）
 
 ### 🎯 期望功能
 - 输入：股票代码（如：000001）
-- 输出：公告详情链接列表
+- 输出：公告基本信息列表（标题、类别、日期、链接等）
 - 时间范围：过去10天
 - 数据源：巨潮资讯网（通过AKShare）
 
@@ -51,14 +51,14 @@
 
 ### 💻 技术实现要点
 - 移除现有的 `date` 参数，改为自动获取过去10天
-- 修改返回格式：从复杂对象结构改为简单的链接数组
 - 使用 `ak.stock_notice_report(symbol='全部', date=日期)` 并按股票代码筛选
 - 循环获取过去10天的数据并合并
+- **仅返回公告基本信息，不获取URL正文内容**
 
 ### ⚠️ 注意事项
 - 需要处理AKShare接口可能的异常
 - 某些日期可能没有公告数据
-- 需要去重处理相同的公告链接
+- 需要去重处理相同的公告
 
 ### 📊 当前状态
 🔄 **需要重构** - 现有代码只支持单日查询，需要扩展为10天范围
@@ -71,13 +71,17 @@
 
 ### 📋 需求描述
 - 基于股票代码获取过去10天的公告数据
-- 使用百炼大模型 Qwen3 进行智能总结
-- 总结字数限制在500字��
+- **访问每个公告的URL链接，获取正文内容**
+- 使用百炼大模型 Qwen3 对每个公告进行智能总结
+- 将所有公告的总结再次汇总为最终的 content
 
 ### 🎯 期望功能
 - 输入：股票代码
-- 处理流程：调用任务1接口 → 获取公告内容 → AI总结
-- 输出：结构化的总结内容
+- 处理流程：
+  1. 调用任务1接口获取公告列表
+  2. **逐个访问每个公告的URL，解析获取正文内容**
+  3. 对每个公告正文调用LLM总结成一句话
+  4. 将所有单句总结再次调用LLM汇总为最终content（500字内）
 
 ### 📤 响应格式
 ```json
@@ -85,8 +89,8 @@
     "success": true,
     "data": {
         "summary": "【AI总结功能预留】针对股票：000001的公告总结",
-        "content": "基于该股票过去10天的公告内容，通过百炼大模型Qwen3分析得出...",
-        "word_count": 0,
+        "content": "基于该股票过去10天的公告内容深度分析：公告1总结句+公告2总结句+...，综合分析得出最终投资观点和关键信息汇总。",
+        "word_count": 485,
         "model_info": {
             "model": "qwen3",
             "provider": "百炼大模型",
@@ -98,167 +102,161 @@
 ```
 
 ### 💻 技术实现要点
-- 调用任务1的接口获取公告链接
-- 下载并解析PDF公告内容
+- **与任务1的关键区别**：需要访问URL链接并获取网页正文内容
+- 调用任务1的接口获取公告列表
+- **网页内容获取与解析** - 推荐技术方案：
+  
+  **方案1: requests + beautifulsoup4 - 基础方案** ✅
+  ```python
+  import requests
+  from bs4 import BeautifulSoup
+  
+  def extract_web_content(url: str) -> str:
+      response = requests.get(url, timeout=30)
+      soup = BeautifulSoup(response.content, 'html.parser')
+      # 移除脚本和样式标签
+      for script in soup(["script", "style"]):
+          script.decompose()
+      return soup.get_text(strip=True)
+  ```
+  - **优势**: 简单易用、社区支持好
+  - **适用**: 大部分普通网页
+  
+  **方案2: httpx + selectolax - 高性能方案** ⭐ 推荐
+  ```python
+  import httpx
+  from selectolax.parser import HTMLParser
+  
+  async def extract_web_content(url: str) -> str:
+      async with httpx.AsyncClient() as client:
+          response = await client.get(url, timeout=30)
+          tree = HTMLParser(response.text)
+          # 移除不需要的元素
+          for tag in tree.css('script, style, nav, header, footer'):
+              tag.decompose()
+          return tree.body.text(strip=True) if tree.body else ""
+  ```
+  - **优势**: 异步支持、解析速度快5-10倍、内存效率高
+  - **适用**: 高并发场景、大量URL处理
+  
+  **方案3: playwright - 重量级方案**
+  ```python
+  from playwright.async_api import async_playwright
+  
+  async def extract_web_content(url: str) -> str:
+      async with async_playwright() as p:
+          browser = await p.chromium.launch()
+          page = await browser.new_page()
+          await page.goto(url)
+          content = await page.inner_text('body')
+          await browser.close()
+          return content
+  ```
+  - **优势**: 处理JavaScript渲染、反爬虫能力强
+  - **适用**: 复杂SPA页面、有反爬虫机制的网站
+  - **缺点**: 资源消耗大、启动慢
+  
+  **推荐组合方案**:
+  ```python
+  import httpx
+  from selectolax.parser import HTMLParser
+  import requests
+  from bs4 import BeautifulSoup
+  
+  async def extract_announcement_content(self, url: str) -> str:
+      try:
+          # 首选：httpx + selectolax (高性能异步)
+          async with httpx.AsyncClient(timeout=30) as client:
+              response = await client.get(url)
+              tree = HTMLParser(response.text)
+              
+              # 尝试提取主要内容区域
+              content_selectors = [
+                  '.content', '.article-content', '.main-content',
+                  '#content', 'main', 'article', '.post-content'
+              ]
+              
+              for selector in content_selectors:
+                  content_node = tree.css_first(selector)
+                  if content_node:
+                      return content_node.text(strip=True)
+              
+              # 退化到全文提取
+              for tag in tree.css('script, style, nav, header, footer'):
+                  tag.decompose()
+              return tree.body.text(strip=True) if tree.body else ""
+              
+      except Exception as e:
+          # 备选方案：requests + beautifulsoup (兼容性好)
+          try:
+              response = requests.get(url, timeout=30)
+              soup = BeautifulSoup(response.content, 'html.parser')
+              
+              # 尝试提取主要内容
+              content_tags = soup.find(['div', 'article', 'main'], 
+                                     class_=['content', 'article-content', 'main-content'])
+              if content_tags:
+                  return content_tags.get_text(strip=True)
+              
+              # 清理不需要的标签
+              for script in soup(["script", "style", "nav", "header", "footer"]):
+                  script.decompose()
+              return soup.get_text(strip=True)
+              
+          except Exception as e2:
+              logger.error(f"网页内容提取失败: {url}, 错误: {str(e2)}")
+              return ""
+  ```
+
+- **分层LLM调用**：
+  1. 第一层：每个公告网页正文 → LLM → 单句总结
+  2. 第二层：所有单句总结 → LLM → 最终content（500字内）
 - 集成百炼大模型API（待实现）
-- 实现500字限制的总结逻辑
-- 简化响应结构：移除 `key_points`、`impact_analysis`、`investment_suggestion`
 
-### ⚠️ 注意事项
-- PDF内容解析的技术选型
-- 百炼大模型API的接入配置
-- 总结内容的质量控制
-- 处理网络请求超时和重试机制
-
-### 📊 当前状态
-❌ **待开发** - 当前只有预留接口，需要完整实现
-
----
-
-## 任务3: Webhook接口（n8n专用）
-
-**接口**: `POST /api/v1/webhook/announcements`
-
-### 📋 需求描述
-- 批量处理多个股票代码的公告查询
-- 为 n8n 工作流优化的接口设计
-- 支持指定日期或默认当天
-
-### 🎯 期望功能
-- 输入：股票代码数组 + 可选日期
-- 输出：每个股票的公告数据
-- 批量处理能力
-
-### 📤 响应格式
-```json
-{
-    "success": true,
-    "data": [
-        {
-            "stock_code": "000001",
-            "announcements": {
-                "announcements": [...],
-                "total": 5,
-                "page": 1,
-                "size": 50
-            }
-        }
-    ],
-    "message": "Webhook处理成功，共处理2只股票"
-}
+### 🔄 处理流程详解
+```
+股票代码 → 任务1接口 → 公告列表[{title, url, ...}]
+    ↓
+遍历每个公告URL → 访问网页 → 解析HTML提取正文 → LLM总结 → 单句摘要
+    ↓
+收集所有单句摘要 → 再次调用LLM → 最终content总结
 ```
 
-### 💻 技术实现要点
-- 根据任务1的新需求调整实现逻辑
-- 并发处理多个股票代码
-- 错误处理和部分失败的情况
-- 响应时间控制
-
 ### ⚠️ 注意事项
-- n8n集成的最佳实践
-- 批量请求的性能优化
-- 单个股票失败不应影响其他股票
+- **网页内容获取的技术挑战**：
+  - **推荐使用httpx + selectolax**: 异步高性能，解析速度快
+  - **备选requests + beautifulsoup**: 兼容性好，社区支持完善
+  - **重量级playwright**: 仅在遇到JavaScript渲染或反爬虫时使用
+  - 网页访问超时控制（建议30秒）
+  - User-Agent设置避免被反爬虫拦截
+  - 请求频率控制，避免给目标服务器造成压力
+  - 处理各种HTTP状态码和异常情况
+- **内容提取优化**：
+  - 智能识别主要内容区域（避免导航、广告等噪音）
+  - 文本清理：去除多余空格、换行符
+  - 长文本截取：LLM输入Token限制处理
+- **LLM调用优化**：
+  - 批量调用 vs 逐个调用的性能权衡
+  - Token消耗控制（网页文本可能很长，需要截取关键部分）
+  - 调用失败的降级处理
+- **内容质量控制**：
+  - 网页文本提取质量检查（去除HTML标签、格式化）
+  - 单句总结的质量检查
+  - 最终总结的逻辑性和连贯性
 
-### 📊 当前状态
-🔄 **需要重构** - 需要适配任务1的新实现
+### 📦 新增依赖包
+需要在 `requirements.txt` 中添加：
+```
+# 推荐方案
+httpx>=0.25.0          # 高性能异步HTTP客户端
+selectolax>=0.3.17     # 快速HTML解析器
 
----
+# 备选方案  
+requests>=2.31.0       # HTTP请求库（已有）
+beautifulsoup4>=4.12.0 # HTML解析库
+lxml>=4.9.0           # beautifulsoup的高性能解析器
 
-## 任务4: 系统健康检查API
-
-**接口**: `GET /health`
-
-### 📋 需求描述
-- 提供系统健康状态检查
-- 监控关键组件状态
-
-### 💻 技术实现要点
-- 检查AKShare连接状态
-- 检查百炼大模型连接状态（可选）
-- 返回系统基本信息
-
-### 📊 当前状态
-✅ **已完成** - 基础功能已实现
-
----
-
-## 任务5: 系统信息API
-
-**接口**: `GET /api/v1/system/info`
-
-### 📋 需求描述
-- 返回系统版本、配置等信息
-
-### 💻 技术实现要点
-- 读取环境变量配置
-- 返回API版本信息
-
-### 📊 当前状态
-✅ **已完成** - 基础功能已实现
-
----
-
-## 📅 开发计划
-
-### 阶段1: 核心功能重构 (优先级: 高)
-1. **任务1** - 重构获取公告列表API，支持10天范围查询
-2. **任务3** - 相应调整Webhook接口
-
-### 阶段2: AI功能开发 (优先级: 中)
-3. **任务2** - 实现AI智能总结功能
-   - PDF内容解析
-   - 百炼大模型集成
-   - 总结逻辑优化
-
-### 阶段3: 优化完善 (优先级: 低)
-4. 性能优化和错误处理改进
-5. 文档完善和测试覆盖
-
----
-
-## 🔧 技术债务
-
-### 当前代码问题
-1. `announcement_service.py` 中的 `get_announcements` 只支持单日查询
-2. 返回格式与README.md中的期望不符
-3. `summarize_announcement` 方法的响应结构需要简化
-4. 缺少PDF内容解析功能
-5. 未集成百炼大模型
-
-### 数据模型调整
-1. 需要新增或调整Pydantic模型以支持新的响应格式
-2. 路由器参数需要与服务方法保持一致
-
----
-
-## 🧪 测试计划
-
-### 单元测试
-- [ ] AKShare接口调用测试
-- [ ] 数据处理逻辑测试
-- [ ] 错误处理测试
-
-### 集成测试
-- [ ] API端点测试
-- [ ] n8n集成测试
-- [ ] 百炼大模型集成测试
-
-### 性能测试
-- [ ] 批量查询性能测试
-- [ ] 10天数据获取性能测试
-- [ ] 并发处理能力测试
-
----
-
-## 📝 备注
-
-1. **优先完成任务1**，因为任务2和任务3都依赖于它
-2. **PDF解析技术选型**：考虑使用 `PyPDF2`、`pdfplumber` 或 `pymupdf`
-3. **百炼大模型集成**：需要获取API密钥和文档
-4. **错误处理**：统一使用 `StockAPIException` 进行异常处理
-5. **日志记录**：保持详细的操作日志以便调试
-
-## 🔄 更新历史
-
-- **2024-09-17**: 初始任务清单创建
-- 基于当前代码状态和README.md需求制定
+# 重量级方案（按需）
+playwright>=1.40.0     # 浏览器自动化（处理JS渲染）
+```
+````
