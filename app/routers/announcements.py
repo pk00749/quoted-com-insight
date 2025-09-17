@@ -23,7 +23,7 @@ async def get_stock_announcements(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部服务器错误: {str(e)}")
 
-@router.post("/announcements/summarize", response_model=BaseResponse)
+@router.post("/announcements/{stock_code}/sum", response_model=BaseResponse)
 async def summarize_announcement(request: AnnouncementSummarizeRequest):
     """智能总结公告（百炼大模型qwen3）"""
     try:
