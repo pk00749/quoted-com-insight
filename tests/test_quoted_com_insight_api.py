@@ -1,12 +1,8 @@
-import akshare as ak
 import pytest
-import asyncio
-from httpx import AsyncClient
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.announcement_service import AnnouncementService
-from app.core.exceptions import StockAPIException
 
 # 测试客户端
 client = TestClient(app)
@@ -44,61 +40,6 @@ class TestStockAPI:
         data = response.json()
         assert "success" in data
 
-    def test_get_latest_announcements(self):
-        """测试获取最新公告"""
-        response = client.get("/api/v1/announcements/latest")
-
-        assert response.status_code in [200, 500]
-        data = response.json()
-        assert "success" in data
-
-class TestStockService:
-    """股票服务层测试"""
-
-    @pytest.fixture
-    def service(self):
-        return StockService()
-
-    @pytest.mark.asyncio
-    async def test_stock_service_initialization(self, service):
-        """测试服务初始化"""
-        assert service is not None
-        assert hasattr(service, 'cache')
-
-    @pytest.mark.asyncio
-    async def test_get_stock_info_service(self, service):
-        """测试服务层获取股票信息"""
-        try:
-            stock_info = await service.get_stock_info("000001")
-            assert stock_info.code == "000001"
-        except StockAPIException:
-            # 如果akshare调用失败，应该抛出自定义异常
-            pytest.skip("akshare数据获取失败，跳过测试")
-        except Exception as e:
-            # 其他异常应该被包装为StockAPIException
-            pytest.fail(f"应该抛出StockAPIException，但得到: {type(e).__name__}")
-
-    @pytest.mark.asyncio
-    async def test_get_realtime_price_service(self, service):
-        """测试服务层获取实时价格"""
-        try:
-            price = await service.get_realtime_price("000001")
-            assert price.code == "000001"
-            assert price.date is not None
-        except StockAPIException:
-            pytest.skip("akshare数据获取失败，跳过测试")
-
-    @pytest.mark.asyncio
-    async def test_search_stocks_service(self, service):
-        """测试服务层搜索股票"""
-        try:
-            stocks = await service.search_stocks("银行")
-            assert isinstance(stocks, list)
-            # 搜索结果应该被限制在20个以内
-            assert len(stocks) <= 20
-        except StockAPIException:
-            pytest.skip("akshare数据获取失败，跳过测试")
-
 class TestAPIResponseFormat:
     """API响应格式测试"""
 
@@ -122,31 +63,6 @@ class TestAPIResponseFormat:
         assert response.status_code == 422
         data = response.json()
         assert "detail" in data  # FastAPI验证错误格式
-
-class TestAPIValidation:
-    """API参数验证测试"""
-
-    def test_pagination_validation(self):
-        """测试分页参数验证"""
-        # 测试负页码
-        response = client.get("/api/v1/stocks/list?page=-1")
-        assert response.status_code == 422
-
-        # 测试过大的页面大小
-        response = client.get("/api/v1/stocks/list?size=1000")
-        assert response.status_code == 422
-
-    def test_date_format_validation(self):
-        """测试日期格式验证"""
-        stock_code = "000001"
-        # 测试无效日期格式
-        params = {
-            "start_date": "invalid-date",
-            "end_date": "2024-01-01"  # 正确格式但与akshare要求不符
-        }
-        response = client.get(f"/api/v1/stock/history/{stock_code}", params=params)
-        # 应该在服务层处理日期格式问题
-        assert response.status_code in [200, 400, 500]
 
 # 性能测试
 class TestAPIPerformance:

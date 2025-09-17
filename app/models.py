@@ -17,13 +17,12 @@ class ErrorResponse(BaseModel):
 
 class Announcement(BaseModel):
     """公告信息"""
-    id: str = Field(..., description="公告唯一标识")
-    stock_code: str = Field(..., description="股票代码")
-    stock_name: str = Field(..., description="股票名称")
+    stock_code: str = Field(..., description="代码")
+    stock_name: str = Field(..., description="名称")
     title: str = Field(..., description="公告标题")
     publish_date: str = Field(..., description="公告日期")
     category: str = Field(..., description="公告类型")
-    url: Optional[str] = Field(None, description="公告网址")
+    url: Optional[str] = Field(None, description="网址")
 
 class AnnouncementList(BaseModel):
     """公告列表"""

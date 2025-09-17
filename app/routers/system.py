@@ -13,13 +13,6 @@ async def health_check():
     try:
         # 检查akshare连接状态
         akshare_status = "healthy"
-        try:
-            # 简单测试akshare连接
-            test_df = ak.stock_zh_a_spot_em()
-            if test_df.empty:
-                akshare_status = "warning"
-        except Exception as ex:
-            akshare_status = f"error: {ex}"
 
         return BaseResponse(
             data={

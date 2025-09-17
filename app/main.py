@@ -4,9 +4,8 @@ from datetime import datetime
 import uvicorn
 import logging
 
-from .routers import announcements, system
-from .core.config import settings
-from .core.exceptions import create_exception_handler
+from app.routers import announcements, system
+from app.core.exceptions import create_exception_handler
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
