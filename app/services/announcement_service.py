@@ -1,6 +1,6 @@
 import akshare as ak
 import pandas as pd
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime
 import logging
 import asyncio
@@ -45,7 +45,7 @@ class AnnouncementService:
             logger.info(f"调用 ak.stock_notice_report 获取股票 {stock_code} 在 {date} 的公告")
 
             # 使用akshare的stock_notice_report接口
-            df = ak.stock_notice_report(symbol='财务报告', date=date)
+            df = ak.stock_notice_report(symbol='全部', date=date)
             df_filtered = df[df['代码'] == stock_code]
             if not df_filtered.empty:
                 logger.info(f"成功获取公告数据: {len(df)} 条")

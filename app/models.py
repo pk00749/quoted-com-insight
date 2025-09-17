@@ -12,6 +12,7 @@ class BaseResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """错误响应格式"""
     success: bool = False
+    message: str = "操作失败"
     error: Dict[str, str]
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 

@@ -17,7 +17,7 @@ async def get_stock_announcements(
         announcements = await announcement_service.get_announcements(
             stock_code, date
         )
-        return BaseResponse(data=announcements, message="获取公告成功")
+        return BaseResponse(data=announcements, message="调用成功")
     except StockAPIException as e:
         raise HTTPException(status_code=400, detail=e.message)
     except Exception as e:
