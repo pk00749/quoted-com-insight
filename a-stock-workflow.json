@@ -1,0 +1,310 @@
+{
+  "name": "A股公告获取与总结工作流",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "value": "0 18 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "定时触发器",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://www.cninfo.com.cn/new/hisAnnouncement/query",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "stock",
+              "value": ""
+            },
+            {
+              "name": "searchkey",
+              "value": ""
+            },
+            {
+              "name": "plate",
+              "value": ""
+            },
+            {
+              "name": "category",
+              "value": ""
+            },
+            {
+              "name": "trade",
+              "value": ""
+            },
+            {
+              "name": "column",
+              "value": "szse"
+            },
+            {
+              "name": "columnTitle",
+              "value": "历史公告查询"
+            },
+            {
+              "name": "pageNum",
+              "value": "1"
+            },
+            {
+              "name": "pageSize",
+              "value": "30"
+            },
+            {
+              "name": "tabName",
+              "value": "fulltext"
+            },
+            {
+              "name": "seDate",
+              "value": "={{ new Date().toISOString().split('T')[0] }}~={{ new Date().toISOString().split('T')[0] }}"
+            }
+          ]
+        }
+      },
+      "id": "fetch-announcements",
+      "name": "获取公告数据",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const announcements = items[0].json.announcements || [];\nconst today = new Date().toISOString().split('T')[0];\n\n// 过滤今日公告并提取重要信息\nconst todayAnnouncements = announcements\n  .filter(item => item.announcementTime && item.announcementTime.includes(today))\n  .map(item => ({\n    companyCode: item.secCode,\n    companyName: item.secName,\n    title: item.announcementTitle,\n    time: item.announcementTime,\n    url: `http://static.cninfo.com.cn/${item.adjunctUrl}`,\n    type: item.columnId\n  }))\n  .slice(0, 20); // 限制数量\n\nreturn todayAnnouncements.map(announcement => ({ json: announcement }));"
+      },
+      "id": "process-data",
+      "name": "处理公告数据",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-announcements",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-has-announcements",
+      "name": "检查是否有公告",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 汇���所有公告信息\nconst allAnnouncements = items.map(item => item.json);\n\n// 按公司分组\nconst groupedByCompany = allAnnouncements.reduce((acc, announcement) => {\n  const key = announcement.companyName;\n  if (!acc[key]) {\n    acc[key] = [];\n  }\n  acc[key].push(announcement);\n  return acc;\n}, {});\n\n// 生成摘要文本\nlet summaryText = `📊 A股公告日报 - ${new Date().toLocaleDateString('zh-CN')}\\n\\n`;\nsummaryText += `今日共收集到 ${allAnnouncements.length} 条公告\\n\\n`;\n\n// 按公司列出公告\nObject.entries(groupedByCompany).forEach(([companyName, announcements]) => {\n  summaryText += `🏢 ${companyName}\\n`;\n  announcements.forEach(ann => {\n    summaryText += `  • ${ann.title}\\n`;\n  });\n  summaryText += '\\n';\n});\n\nreturn [{ json: { \n  summary: summaryText,\n  announcements: allAnnouncements,\n  count: allAnnouncements.length\n }}];"
+      },
+      "id": "prepare-summary",
+      "name": "准备摘要数据",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 200]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "chatId": "{{ $('准备摘要数据').item.json.summary }}",
+        "text": "请基于以下A股公告信息，生成一份简洁的中文总结报告，突出重要的公司动态和市场信息：\\n\\n{{ $json.summary }}\\n\\n要求：\\n1. 按重要性排序\\n2. 突出影响较大的公告\\n3. 简洁明了，控制在500字以内\\n4. 使用专业但易懂的语言",
+        "additionalFields": {
+          "model": "gpt-4"
+        }
+      },
+      "id": "llm-summary",
+      "name": "LLM总结公告",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1360, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send",
+        "method": "POST",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "YOUR_WECHAT_WEBHOOK_KEY"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "jsonBody": "{{ {\\n  \\\"msgtype\\\": \\\"text\\\",\\n  \\\"text\\\": {\\n    \\\"content\\\": $('LLM总结公告').item.json.message.content\\n  }\\n} }}"
+      },
+      "id": "send-wechat",
+      "name": "发送微信消息",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1580, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('工作流执行完成');\nreturn [{ json: { status: 'completed', timestamp: new Date().toISOString() } }];"
+      },
+      "id": "completion-log",
+      "name": "完成日志",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('今日无新公告');\nreturn [{ json: { status: 'no_announcements', timestamp: new Date().toISOString() } }];"
+      },
+      "id": "no-announcements-log",
+      "name": "无公告日志",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 400]
+    }
+  ],
+  "connections": {
+    "定时触发器": {
+      "main": [
+        [
+          {
+            "node": "获取公告数据",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "获取公告数据": {
+      "main": [
+        [
+          {
+            "node": "处理公告数据",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "处理公告数据": {
+      "main": [
+        [
+          {
+            "node": "检查是否有公告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "检查是否有公告": {
+      "main": [
+        [
+          {
+            "node": "准备摘要数据",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "无公告日志",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备摘要数据": {
+      "main": [
+        [
+          {
+            "node": "LLM总结公告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM总结公告": {
+      "main": [
+        [
+          {
+            "node": "发送微信消息",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "发送微信消息": {
+      "main": [
+        [
+          {
+            "node": "完成日志",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-08-17T00:00:00.000Z",
+  "versionId": "1"
+}
+
