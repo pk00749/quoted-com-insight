@@ -5,7 +5,7 @@ from httpx import AsyncClient
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.stock_service import StockService
+from app.services.announcement_service import AnnouncementService
 from app.core.exceptions import StockAPIException
 
 # 测试客户端
@@ -17,7 +17,7 @@ class TestStockAPI:
     @pytest.fixture
     def stock_service(self):
         """股票服务实例"""
-        return StockService()
+        return AnnouncementService()
 
     def test_health_check(self):
         """测试健康检查接口"""

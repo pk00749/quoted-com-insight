@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional
+from typing import Optional
 
-from ..models import BaseResponse, Announcement, AnnouncementList, AnnouncementSummary, AnnouncementSummarizeRequest, WebhookRequest
+from ..models import BaseResponse, AnnouncementSummarizeRequest, WebhookRequest
 from ..services.announcement_service import announcement_service
 from ..core.exceptions import StockAPIException
 

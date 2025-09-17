@@ -21,12 +21,9 @@ class Announcement(BaseModel):
     stock_code: str = Field(..., description="股票代码")
     stock_name: str = Field(..., description="股票名称")
     title: str = Field(..., description="公告标题")
-    publish_date: str = Field(..., description="发布日期")
-    category: str = Field(..., description="公告类别")
-    url: Optional[str] = Field(None, description="公告链接")
-    content: Optional[str] = Field(None, description="公告全文内容")
-    importance: Optional[str] = Field(None, description="重要程度: high|medium|low")
-    keywords: Optional[List[str]] = Field(None, description="关键词列表")
+    publish_date: str = Field(..., description="公告日期")
+    category: str = Field(..., description="公告类型")
+    url: Optional[str] = Field(None, description="公告网址")
 
 class AnnouncementList(BaseModel):
     """公告列表"""
