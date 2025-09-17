@@ -39,6 +39,8 @@ class AnnouncementList(BaseModel):
 
 class AnnouncementSummary(BaseModel):
     """公告智能总结"""
+    model_config = {"protected_namespaces": ()}
+
     summary: str = Field(..., description="智能总结标题")
     content: str = Field(..., description="智能总结内容（500字以内）")
     word_count: int = Field(..., description="字数统计")
