@@ -105,7 +105,8 @@ class AnnouncementService:
 
         return announcements
 
-    def _remove_duplicates(self, announcements: List[Announcement]) -> List[Announcement]:
+    @staticmethod
+    def _remove_duplicates(announcements: List[Announcement]) -> List[Announcement]:
         """去重处理，基于URL和标题"""
         seen = set()
         unique_announcements = []
@@ -119,7 +120,8 @@ class AnnouncementService:
 
         return unique_announcements
 
-    def _parse_date(self, date_str) -> str:
+    @staticmethod
+    def _parse_date(date_str) -> str:
         """解析日期格式"""
         try:
             if pd.isna(date_str) or str(date_str).strip() == '':
@@ -138,7 +140,8 @@ class AnnouncementService:
         except:
             return datetime.now().strftime('%Y-%m-%d')
 
-    async def summarize_announcement(self, announcement_data: dict) -> dict:
+    @staticmethod
+    async def summarize_announcement(announcement_data: dict) -> dict:
         """使用百炼大模型总结公告（预留接口）"""
         try:
             # TODO: 集成百炼大模型qwen3
