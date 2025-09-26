@@ -165,5 +165,95 @@ class AnnouncementService:
             logger.error(f"AI总结失败: {str(e)}")
             raise StockAPIException(f"AI总结功能异常: {str(e)}", "SUMMARIZE_ERROR")
 
+    async def summarize_announcements(self, stock_code: str):
+        """AI智能总结公告（正文提取+LLM预留）"""
+        try:
+            # 1. 获取公告列表
+            announcement_list = await self.get_announcements(stock_code)
+            announcements = announcement_list.announcements
+            if not announcements:
+                return {
+                    "summary": f"股票{stock_code}近10天无公告",
+                    "content": "",
+                    "word_count": 0,
+                    "model_info": {
+                        "model": "qwen3",
+                        "provider": "百炼大模型",
+                        "status": "接口预留"
+                    }
+                }
+
+            # 2. 依次访问每个公告URL，提取正文内容
+            contents = []
+            for ann in announcements:
+                text = await self._extract_announcement_content(ann.url)
+                contents.append(text)
+            print(contents)
+            # 3. 预留LLM调用接口，单条总结与最终汇总
+            # TODO: 调用百炼大模型qwen3对每个text生成一句话总结
+            single_summaries = [f"【预留AI摘要】{ann.title}" for ann in announcements]
+            # TODO: 再次调用LLM对所有单句摘要进行汇总
+            final_content = "\n".join(single_summaries)[:500]
+
+            return {
+                "summary": f"【AI总结功能预留】针对股票：{stock_code}的公告总结",
+                "content": final_content,
+                "word_count": len(final_content),
+                "model_info": {
+                    "model": "qwen3",
+                    "provider": "百炼大模型",
+                    "status": "接口预留"
+                }
+            }
+        except Exception as e:
+            logger.error(f"AI智能总结失败: {stock_code}, 错误: {str(e)}")
+            raise StockAPIException(f"AI智能总结失败: {str(e)}", "SUMMARIZE_ERROR")
+
+    @staticmethod
+    async def _extract_announcement_content(url: str) -> str:
+        """优先用httpx+selectolax，失败则降级requests+bs4，提取正文，优先id=notice_content"""
+        if not url:
+            return ""
+        try:
+            import httpx
+            from selectolax.parser import HTMLParser
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(url)
+                tree = HTMLParser(resp.text)
+                # 优先提取id=notice_content
+                node = tree.css_first('#notice_content')
+                if node:
+                    return node.text(strip=True)
+                # 其次尝试主要内容区域
+                selectors = ['.content', '.article-content', '.main-content', '#content', 'main', 'article', '.post-content']
+                for sel in selectors:
+                    node = tree.css_first(sel)
+                    if node:
+                        return node.text(strip=True)
+                # 退化到全文
+                for tag in tree.css('script, style, nav, header, footer'):
+                    tag.decompose()
+                return tree.body.text(strip=True) if tree.body else ""
+        except Exception:
+            try:
+                import requests
+                from bs4 import BeautifulSoup
+                resp = requests.get(url, timeout=30)
+                soup = BeautifulSoup(resp.content, 'html.parser')
+                # 优先id=notice_content
+                tag = soup.find(id='notice_content')
+                if tag:
+                    return tag.get_text(strip=True)
+                # 其次主要内容
+                tag = soup.find(['div', 'article', 'main'], class_=['content', 'article-content', 'main-content'])
+                if tag:
+                    return tag.get_text(strip=True)
+                for script in soup(["script", "style", "nav", "header", "footer"]):
+                    script.decompose()
+                return soup.get_text(strip=True)
+            except Exception as e2:
+                logger.error(f"网页内容提取失败: {url}, 错误: {str(e2)}")
+                return ""
+
 # 创建服务实例
 announcement_service = AnnouncementService()
