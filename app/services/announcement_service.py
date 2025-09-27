@@ -246,7 +246,8 @@ class AnnouncementService:
             logger.error(f"提取公告内容失败: {url}, 错误: {str(e)}")
             return ""
 
-    def _extract_pdf_content(self, pdf_url: str) -> str:
+    @staticmethod
+    def _extract_pdf_content(pdf_url: str) -> str:
         """提取PDF文件的正文内容"""
         try:
             # 修复示例链接的处理逻辑，确保支持带有查询参数的PDF链接
