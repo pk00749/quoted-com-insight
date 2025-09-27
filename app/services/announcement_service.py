@@ -4,6 +4,10 @@ from typing import List
 from datetime import datetime, timedelta
 import logging
 import asyncio
+import httpx
+import pdfplumber
+from io import BytesIO
+from playwright.async_api import async_playwright
 
 from ..models import Announcement, AnnouncementList
 from ..core.exceptions import StockAPIException
@@ -209,51 +213,55 @@ class AnnouncementService:
             logger.error(f"AI智能总结失败: {stock_code}, 错误: {str(e)}")
             raise StockAPIException(f"AI智能总结失败: {str(e)}", "SUMMARIZE_ERROR")
 
-    @staticmethod
-    async def _extract_announcement_content(url: str) -> str:
-        """优先用httpx+selectolax，失败则降级requests+bs4，提取正文，优先id=notice_content"""
-        if not url:
-            return ""
+    async def _extract_announcement_content(self, url: str) -> str:
+        """提取公告正文内容，优先从PDF中获取"""
         try:
-            import httpx
-            from selectolax.parser import HTMLParser
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(url)
-                tree = HTMLParser(resp.text)
-                # 优先提取id=notice_content
-                node = tree.css_first('#notice_content')
-                if node:
-                    return node.text(strip=True)
-                # 其次尝试主要内容区域
-                selectors = ['.content', '.article-content', '.main-content', '#content', 'main', 'article', '.post-content']
-                for sel in selectors:
-                    node = tree.css_first(sel)
-                    if node:
-                        return node.text(strip=True)
-                # 退化到全文
-                for tag in tree.css('script, style, nav, header, footer'):
-                    tag.decompose()
-                return tree.body.text(strip=True) if tree.body else ""
-        except Exception:
-            try:
-                import requests
-                from bs4 import BeautifulSoup
-                resp = requests.get(url, timeout=30)
-                soup = BeautifulSoup(resp.content, 'html.parser')
-                # 优先id=notice_content
-                tag = soup.find(id='notice_content')
-                if tag:
-                    return tag.get_text(strip=True)
-                # 其次主要内容
-                tag = soup.find(['div', 'article', 'main'], class_=['content', 'article-content', 'main-content'])
-                if tag:
-                    return tag.get_text(strip=True)
-                for script in soup(["script", "style", "nav", "header", "footer"]):
-                    script.decompose()
-                return soup.get_text(strip=True)
-            except Exception as e2:
-                logger.error(f"网页内容提取失败: {url}, 错误: {str(e2)}")
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(url, timeout=30000)
+
+                # 尝试获取PDF链接
+                pdf_link_tag = await page.query_selector('a.pdf-link')
+                if pdf_link_tag:
+                    pdf_url = await pdf_link_tag.get_attribute('href')
+                    if pdf_url and pdf_url.endswith('.pdf'):
+                        pdf_url = pdf_url.split('?')[0]  # 移除查询参数
+                        logger.info(f"发现PDF链接: {pdf_url}")
+                        await browser.close()
+                        return self._extract_pdf_content(pdf_url)
+
+                # 如果没有PDF链接，回退到网页正文提取
+                content_div = await page.query_selector('#notice_content')
+                if content_div:
+                    content = await content_div.inner_text()
+                    await browser.close()
+                    return content.strip()
+
+                logger.warning(f"未找到公告正文内容: {url}")
+                await browser.close()
                 return ""
+
+        except Exception as e:
+            logger.error(f"提取公告内容失败: {url}, 错误: {str(e)}")
+            return ""
+
+    def _extract_pdf_content(self, pdf_url: str) -> str:
+        """提取PDF文件的正文内容"""
+        try:
+            # 修复示例链接的处理逻辑，确保支持带有查询参数的PDF链接
+            pdf_url = pdf_url.split('?')[0]  # 移除查询参数
+
+            response = httpx.get(pdf_url, timeout=30)
+            response.raise_for_status()
+
+            with pdfplumber.open(BytesIO(response.content)) as pdf:
+                text = ''.join(page.extract_text() for page in pdf.pages if page.extract_text())
+                return text.strip()
+
+        except Exception as e:
+            logger.error(f"提取PDF内容失败: {pdf_url}, 错误: {str(e)}")
+            return ""
 
 # 创建服务实例
 announcement_service = AnnouncementService()
