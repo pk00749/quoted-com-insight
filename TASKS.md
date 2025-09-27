@@ -71,7 +71,9 @@
 
 ### 📋 需求描述
 - 基于股票代码获取过去10天的公告数据
-- **访问每个公告的URL链接，获取正文内容**
+- **访问每个公告的URL链接，优先通过class为pdf-link的元素获取PDF链接**
+- **如获取到PDF链接，则访问该PDF文件，提取PDF正文内容并返回**
+- **如未获取到PDF链接，则回退为原有网页正文提取逻辑**
 - 使用百炼大模型 Qwen3 对每个公告进行智能总结
 - 将所有公告的总结再次汇总为最终的 content
 
@@ -102,160 +104,48 @@
 ```
 
 ### 💻 技术实现要点
-- **与任务1的关键区别**：需要访问URL链接并获取网页正文内容
-- 调用任务1的接口获取公告列表
-- **网页内容获取与解析** - 推荐技术方案：
-  
-  **方案1: requests + beautifulsoup4 - 基础方案** ✅
-  ```python
-  import requests
-  from bs4 import BeautifulSoup
-  
-  def extract_web_content(url: str) -> str:
-      response = requests.get(url, timeout=30)
-      soup = BeautifulSoup(response.content, 'html.parser')
-      # 移除脚本和样式标签
-      for script in soup(["script", "style"]):
-          script.decompose()
-      return soup.get_text(strip=True)
-  ```
-  - **优势**: 简单易用、社区支持好
-  - **适用**: 大部分普通网页
-  
-  **方案2: httpx + selectolax - 高性能方案** ⭐ 推荐
-  ```python
-  import httpx
-  from selectolax.parser import HTMLParser
-  
-  async def extract_web_content(url: str) -> str:
-      async with httpx.AsyncClient() as client:
-          response = await client.get(url, timeout=30)
-          tree = HTMLParser(response.text)
-          # 移除不需要的元素
-          for tag in tree.css('script, style, nav, header, footer'):
-              tag.decompose()
-          return tree.body.text(strip=True) if tree.body else ""
-  ```
-  - **优势**: 异步支持、解析速度快5-10倍、内存效率高
-  - **适用**: 高并发场景、大量URL处理
-  
-  **方案3: playwright - 重量级方案**
-  ```python
-  from playwright.async_api import async_playwright
-  
-  async def extract_web_content(url: str) -> str:
-      async with async_playwright() as p:
-          browser = await p.chromium.launch()
-          page = await browser.new_page()
-          await page.goto(url)
-          content = await page.inner_text('body')
-          await browser.close()
-          return content
-  ```
-  - **优势**: 处理JavaScript渲染、反爬虫能力强
-  - **适用**: 复杂SPA页面、有反爬虫机制的网站
-  - **缺点**: 资源消耗大、启动慢
-  
-  **推荐组合方案**:
-  ```python
-  import httpx
-  from selectolax.parser import HTMLParser
-  import requests
-  from bs4 import BeautifulSoup
-  
-  async def extract_announcement_content(self, url: str) -> str:
-      try:
-          # 首选：httpx + selectolax (高性能异步)
-          async with httpx.AsyncClient(timeout=30) as client:
-              response = await client.get(url)
-              tree = HTMLParser(response.text)
-              
-              # 尝试提取主要内容区域
-              content_selectors = [
-                  '.content', '.article-content', '.main-content',
-                  '#content', 'main', 'article', '.post-content'
-              ]
-              
-              for selector in content_selectors:
-                  content_node = tree.css_first(selector)
-                  if content_node:
-                      return content_node.text(strip=True)
-              
-              # 退化到全文提取
-              for tag in tree.css('script, style, nav, header, footer'):
-                  tag.decompose()
-              return tree.body.text(strip=True) if tree.body else ""
-              
-      except Exception as e:
-          # 备选方案：requests + beautifulsoup (兼容性好)
-          try:
-              response = requests.get(url, timeout=30)
-              soup = BeautifulSoup(response.content, 'html.parser')
-              
-              # 尝试提取主要内容
-              content_tags = soup.find(['div', 'article', 'main'], 
-                                     class_=['content', 'article-content', 'main-content'])
-              if content_tags:
-                  return content_tags.get_text(strip=True)
-              
-              # 清理不需要的标签
-              for script in soup(["script", "style", "nav", "header", "footer"]):
-                  script.decompose()
-              return soup.get_text(strip=True)
-              
-          except Exception as e2:
-              logger.error(f"网页内容提取失败: {url}, 错误: {str(e2)}")
-              return ""
-  ```
-
-- **分层LLM调用**：
-  1. 第一层：每个公告网页正文 → LLM → 单句总结
-  2. 第二层：所有单句总结 → LLM → 最终content（500字内）
-- 集成百炼大模型API（待实现）
-
-### 🔄 处理流程详解
-```
-股票代码 → 任务1接口 → 公告列表[{title, url, ...}]
-    ↓
-遍历每个公告URL → 访问网页 → 解析HTML提取正文 → LLM总结 → 单句摘要
-    ↓
-收集所有单句摘要 → 再次调用LLM → 最终content总结
-```
+- 使用 Playwright 替代 BeautifulSoup 处理动态渲染的网页内容。
+- 在 `_extract_announcement_content` 方法中：
+  1. 使用 Playwright 加载网页。
+  2. 尝试通过 `a.pdf-link` 选择器获取 PDF 链接。
+  3. 如果找到 PDF 链接且以 `.pdf` 结尾，则提取 PDF 内容。
+  4. 如果未找到 PDF 链接，则回退到提取网页正文内容。
+- 确保 Playwright 的浏览器实例在操作完成后正确关闭。
 
 ### ⚠️ 注意事项
-- **网页内容获取的技术挑战**：
-  - **推荐使用httpx + selectolax**: 异步高性能，解析速度快
-  - **备选requests + beautifulsoup**: 兼容性好，社区支持完善
-  - **重量级playwright**: 仅在遇到JavaScript渲染或反爬虫时使用
-  - 网页访问超时控制（建议30秒）
-  - User-Agent设置避免被反爬虫拦截
-  - 请求频率控制，避免给目标服务器造成压力
-  - 处理各种HTTP状态码和异常情况
-- **内容提取优化**：
-  - 智能识别主要内容区域（避免导航、广告等噪音）
-  - 文本清理：去除多余空格、换行符
-  - 长文本截取：LLM输入Token限制处理
-- **LLM调用优化**：
-  - 批量调用 vs 逐个调用的性能权衡
-  - Token消耗控制（网页文本可能很长，需要截取关键部分）
-  - 调用失败的降级处理
-- **内容质量控制**：
-  - 网页文本提取质量检查（去除HTML标签、格式化）
-  - 单句总结的质量检查
-  - 最终总结的逻辑性和连贯性
+- 确保开发环境中已安装 Playwright，并运行 `playwright install` 安装浏览器依赖。
+- 处理 Playwright 的超时和异常情况，避免因网络问题导致任务失败。
+- 确保提取的内容经过清理，去除多余的空格和换行符。
 
-### 📦 新增依赖包
-需要在 `requirements.txt` 中添加：
-```
-# 推荐方案
-httpx>=0.25.0          # 高性能异步HTTP客户端
-selectolax>=0.3.17     # 快速HTML解析器
+### 📊 当前状态
+🚧 **进行中** - 已切换到 Playwright 处理动态渲染的网页内容，待进一步测试和优化。
 
-# 备选方案  
-requests>=2.31.0       # HTTP请求库（已有）
-beautifulsoup4>=4.12.0 # HTML解析库
-lxml>=4.9.0           # beautifulsoup的高性能解析器
+---
 
-# 重量级方案（按需）
-playwright>=1.40.0     # 浏览器自动化（处理JS渲染）
-```
+## 任务3: 配置化时间范围
+
+**目标**: 将任务1和任务2的时间范围设置为可配置参数
+
+### 📋 需求描述
+- 将时间范围从固定的“过去10天”改为从配置文件 `config.yaml` 中读取。
+- 配置文件中新增参数 `announcement_time_range_days`，用于定义时间范围（单位：天）。
+
+### 🎯 期望功能
+- 配置文件路径：`app/core/config.yaml`
+- 配置示例：
+  ```yaml
+  announcement_time_range_days: 10
+  ```
+- 任务1和任务2的时间范围逻辑需改为读取该配置参数。
+
+### 💻 技术实现要点
+- 在 `config.yaml` 中新增 `announcement_time_range_days` 参数。
+- 修改 `announcement_service.py`，从配置文件中读取时间范围参数。
+- 确保读取配置时有默认值（如10天），以防配置文件缺失或参数未定义。
+
+### ⚠️ 注意事项
+- 配置文件读取失败时需记录日志并使用默认值。
+- 修改后的逻辑需通过单元测试验证。
+
+### 📊 当前状态
+❌ **待开发** - 尚未实现配置化时间范围。
