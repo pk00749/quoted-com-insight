@@ -11,6 +11,7 @@ from playwright.async_api import async_playwright
 
 from ..models import Announcement, AnnouncementList
 from ..core.exceptions import StockAPIException
+from .llm import llm_by_api
 
 logger = logging.getLogger(__name__)
 
@@ -144,31 +145,6 @@ class AnnouncementService:
         except:
             return datetime.now().strftime('%Y-%m-%d')
 
-    @staticmethod
-    async def summarize_announcement(announcement_data: dict) -> dict:
-        """使用百炼大模型总结公告（预留接口）"""
-        try:
-            # TODO: 集成百炼大模型qwen3
-            # 当前返回结构化的预留响应
-
-            summary = {
-                "summary": f"【AI总结功能预留】针对股票：{announcement_data.get('stock_code', '未知股票')}的公告总结",
-                "content": "基于该股票过去10天的公告内容深度分析，通过百炼大模型Qwen3分析得出最终投资观点和关键信息汇总。（当前为预留接口，500字内）",
-                "word_count": 0,
-                "model_info": {
-                    "model": "qwen3",
-                    "provider": "百炼大模型",
-                    "status": "接口预留"
-                }
-            }
-
-            logger.info(f"AI总结请求（预留）: {announcement_data.get('stock_code', '')}")
-            return summary
-
-        except Exception as e:
-            logger.error(f"AI总结失败: {str(e)}")
-            raise StockAPIException(f"AI总结功能异常: {str(e)}", "SUMMARIZE_ERROR")
-
     async def summarize_announcements(self, stock_code: str):
         """AI智能总结公告（正文提取+LLM预留）"""
         try:
@@ -188,21 +164,19 @@ class AnnouncementService:
                 }
 
             # 2. 依次访问每个公告URL，提取正文内容
-            contents = []
+            single_summary = ""
             for ann in announcements:
-                text = await self._extract_announcement_content(ann.url)
-                contents.append(text)
-            print(contents)
-            # 3. 预留LLM调用接口，单条总结与最终汇总
-            # TODO: 调用百炼大模型qwen3对每个text生成一句话总结
-            single_summaries = [f"【预留AI摘要】{ann.title}" for ann in announcements]
-            # TODO: 再次调用LLM对所有单句摘要进行汇总
-            final_content = "\n".join(single_summaries)[:500]
+                content = await self._extract_announcement_content(ann.url)
+                single_summary += llm_by_api(content)+"\n" if content else ""
+                logger.info(single_summary)
 
+            # 3. 预留LLM调用接口，单条总结与最终汇总
+            final_summary = llm_by_api(single_summary)
+            logger.info(final_summary)
             return {
-                "summary": f"【AI总结功能预留】针对股票：{stock_code}的公告总结",
-                "content": final_content,
-                "word_count": len(final_content),
+                "summary": f"针对股票：{stock_code}的公告总结",
+                "content": final_summary,
+                "word_count": len(final_summary),
                 "model_info": {
                     "model": "qwen3",
                     "provider": "百炼大模型",
