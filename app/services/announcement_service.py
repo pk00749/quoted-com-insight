@@ -32,13 +32,11 @@ class AnnouncementService:
             # 使用akshare获取过去10天的公告数据 - 在线程池中执行同步操作
             loop = asyncio.get_event_loop()
             all_announcements = await loop.run_in_executor(None, self._get_10_days_announcements, stock_code)
-
             if not all_announcements:
                 return AnnouncementList(announcements=[], total=0, page=1, size=20)
 
             # 去重处理（基于URL和标题）
             unique_announcements = self._remove_duplicates(all_announcements)
-
             logger.info(f"成功获取并去重后公告数据: {len(unique_announcements)} 条")
 
             return AnnouncementList(
@@ -58,7 +56,7 @@ class AnnouncementService:
 
         # 获取过去10天的日期
         end_date = datetime.now()
-        for i in range(10):
+        for i in range(2):
             current_date = end_date - timedelta(days=i)
             date_str = current_date.strftime('%Y%m%d')
 
@@ -85,9 +83,13 @@ class AnnouncementService:
         """获取股票公告数据（同步方法，在线程池中执行）"""
         try:
             # 使用akshare的stock_notice_report接口
-            df = ak.stock_notice_report(symbol='全部', date=date)
-            df_filtered = df[df['代码'] == stock_code]
-            return df_filtered
+            symbols = ["重大事项", "财务报告", "融资公告", "风险提示", "资产重组", "信息变更", "持股变动"]
+            notice_df = pd.DataFrame()
+            for sym in symbols:
+                df = ak.stock_notice_report(symbol=sym, date=date)
+                df_filtered = df[df['代码'] == stock_code]
+                notice_df.add(df_filtered)
+            return notice_df
         except Exception as e:
             logger.error(f"调用 ak.stock_notice_report 失败: {stock_code}, {date}, 错误: {str(e)}")
             return pd.DataFrame()
@@ -168,7 +170,7 @@ class AnnouncementService:
             for ann in announcements:
                 content = await self._extract_announcement_content(ann.url)
                 single_summary += llm_by_api(content)+"\n" if content else ""
-                logger.info(single_summary)
+                logger.info(f"single sum: {single_summary}")
 
             # 3. 预留LLM调用接口，单条总结与最终汇总
             final_summary = llm_by_api(single_summary)
