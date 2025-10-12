@@ -8,6 +8,7 @@ import httpx
 import pdfplumber
 from io import BytesIO
 from playwright.async_api import async_playwright
+import re
 
 from ..models import Announcement, AnnouncementList
 from ..core.exceptions import StockAPIException
@@ -56,7 +57,7 @@ class AnnouncementService:
 
         # 获取过去10天的日期
         end_date = datetime.now()
-        for i in range(2):
+        for i in range(0, 2):
             current_date = end_date - timedelta(days=i)
             date_str = current_date.strftime('%Y%m%d')
 
@@ -83,13 +84,13 @@ class AnnouncementService:
         """获取股票公告数据（同步方法，在线程池中执行）"""
         try:
             # 使用akshare的stock_notice_report接口
-            symbols = ["重大事项", "财务报告", "融资公告", "风险提示", "资产重组", "信息变更", "持股变动"]
-            notice_df = pd.DataFrame()
-            for sym in symbols:
-                df = ak.stock_notice_report(symbol=sym, date=date)
-                df_filtered = df[df['代码'] == stock_code]
-                notice_df.add(df_filtered)
-            return notice_df
+            # symbols = ["全部"]
+            # notice_df = pd.DataFrame()
+            # for sym in symbols:
+            df = ak.stock_notice_report(symbol="全部", date=date)
+            df_filtered = df[df['代码'] == stock_code]
+                # notice_df = notice_df.add(df_filtered)
+            return df_filtered
         except Exception as e:
             logger.error(f"调用 ak.stock_notice_report 失败: {stock_code}, {date}, 错误: {str(e)}")
             return pd.DataFrame()
@@ -224,7 +225,7 @@ class AnnouncementService:
 
     @staticmethod
     def _extract_pdf_content(pdf_url: str) -> str:
-        """提取PDF文件的正文内容"""
+        """提取PDF文件的正文内容，并仅返回清洗后的前500个字符"""
         try:
             # 修复示例链接的处理逻辑，确保支持带有查询参数的PDF链接
             pdf_url = pdf_url.split('?')[0]  # 移除查询参数
@@ -233,8 +234,16 @@ class AnnouncementService:
             response.raise_for_status()
 
             with pdfplumber.open(BytesIO(response.content)) as pdf:
+                # 聚合所有页面文本
                 text = ''.join(page.extract_text() for page in pdf.pages if page.extract_text())
-                return text.strip()
+                if not text:
+                    return ""
+                # 文本清洗：去除多余空白和换行，避免影响字数统计
+                # 1) 将所有空白统一为单个空格，再去掉空格
+                normalized = re.sub(r"\s+", " ", text).strip()
+                cleaned = normalized.replace(" ", "")
+                # 仅保留前500个字符
+                return cleaned[:500]
 
         except Exception as e:
             logger.error(f"提取PDF内容失败: {pdf_url}, 错误: {str(e)}")
