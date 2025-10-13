@@ -13,6 +13,7 @@ import re
 from ..models import Announcement, AnnouncementList
 from ..core.exceptions import StockAPIException
 from .llm import llm_by_api
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,14 @@ class AnnouncementService:
         self,
         stock_code: str
     ) -> AnnouncementList:
-        """获取单个股票过去10天的公告列表"""
+        """获取单个股票过去N天（可配置）的公告列表"""
         try:
-            logger.info(f"获取股票公告: {stock_code}, 时间范围: 过去10天")
+            days = max(1, int(settings.announcement_time_range_days))
+            logger.info(f"获取股票公告: {stock_code}, 时间范围: 过去{days}天")
 
-            # 使用akshare获取过去10天的公告数据 - 在线程池中执行同步操作
+            # 使用akshare获取过去N天的公告数据 - 在线程池中执行同步操作
             loop = asyncio.get_event_loop()
-            all_announcements = await loop.run_in_executor(None, self._get_10_days_announcements, stock_code)
+            all_announcements = await loop.run_in_executor(None, self._get_range_announcements, stock_code, days)
             if not all_announcements:
                 return AnnouncementList(announcements=[], total=0, page=1, size=20)
 
@@ -51,13 +53,13 @@ class AnnouncementService:
             logger.error(f"获取公告失败: {stock_code}, 错误: {str(e)}")
             raise StockAPIException(f"获取股票公告失败: {str(e)}", "FETCH_ANNOUNCEMENTS_ERROR")
 
-    def _get_10_days_announcements(self, stock_code: str) -> List[Announcement]:
-        """获取过去10天的股票公告数据（同步方法，在线程池中执行）"""
+    def _get_range_announcements(self, stock_code: str, days: int) -> List[Announcement]:
+        """获取过去N天的股票公告数据（同步方法，在线程池中执行）"""
         all_announcements = []
 
-        # 获取过去10天的日期
+        # 获取过去N天的日期（包含今天，向前days-1天）
         end_date = datetime.now()
-        for i in range(0, 2):
+        for i in range(0, days):
             current_date = end_date - timedelta(days=i)
             date_str = current_date.strftime('%Y%m%d')
 
@@ -83,13 +85,8 @@ class AnnouncementService:
     def _get_stock_notice_data(stock_code: str, date: str) -> pd.DataFrame:
         """获取股票公告数据（同步方法，在线程池中执行）"""
         try:
-            # 使用akshare的stock_notice_report接口
-            # symbols = ["全部"]
-            # notice_df = pd.DataFrame()
-            # for sym in symbols:
             df = ak.stock_notice_report(symbol="全部", date=date)
             df_filtered = df[df['代码'] == stock_code]
-                # notice_df = notice_df.add(df_filtered)
             return df_filtered
         except Exception as e:
             logger.error(f"调用 ak.stock_notice_report 失败: {stock_code}, {date}, 错误: {str(e)}")
@@ -156,7 +153,7 @@ class AnnouncementService:
             announcements = announcement_list.announcements
             if not announcements:
                 return {
-                    "summary": f"股票{stock_code}近10天无公告",
+                    "summary": f"股票{stock_code}近{settings.announcement_time_range_days}天无公告",
                     "content": "",
                     "word_count": 0,
                     "model_info": {
@@ -225,7 +222,7 @@ class AnnouncementService:
 
     @staticmethod
     def _extract_pdf_content(pdf_url: str) -> str:
-        """提取PDF文件的正文内容，并仅返回清洗后的前500个字符"""
+        """提取PDF文件的正文内容，并按配置仅返回清洗后的前N个字符"""
         try:
             # 修复示例链接的处理逻辑，确保支持带有查询参数的PDF链接
             pdf_url = pdf_url.split('?')[0]  # 移除查询参数
@@ -242,8 +239,9 @@ class AnnouncementService:
                 # 1) 将所有空白统一为单个空格，再去掉空格
                 normalized = re.sub(r"\s+", " ", text).strip()
                 cleaned = normalized.replace(" ", "")
-                # 仅保留前500个字符
-                return cleaned[:500]
+                # 截断长度由配置控制
+                max_chars = max(1, int(settings.pdf_content_max_chars))
+                return cleaned[:max_chars]
 
         except Exception as e:
             logger.error(f"提取PDF内容失败: {pdf_url}, 错误: {str(e)}")
