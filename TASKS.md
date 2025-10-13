@@ -152,3 +152,45 @@
 
 ### 📊 当前状态
 ✅ **已完成** - 已实现配置化时间范围与PDF截断长度，支持 YAML 与环境变量覆盖，默认10天与500字。
+
+---
+
+## 任务4: Dockerfile 检查与优化
+
+**目标**: 确保容器环境满足本项目运行需求（FastAPI + AKShare + Playwright + pdfplumber），并具备健康检查与非 root 运行的最佳实践。
+
+### 📋 需求描述
+- 验证并完善 Dockerfile，使其在构建与运行阶段满足：
+  - 安装 Playwright 及其系统依赖，并在构建阶段执行浏览器安装。
+  - 支持 pdfplumber 所需依赖（如 Pillow 运行依赖）。
+  - 健康检查依赖 curl 已安装可用。
+  - 非 root 用户能正常运行 Playwright（浏览器文件路径可写）。
+  - 时区、编码及中文字体（如需要）配置。
+
+### 💻 技术实现要点
+- 选择合适基础镜像：
+  - 方案A：使用官方 Playwright 基础镜像（推荐，省去依赖安装）。
+  - 方案B：在 python-slim 镜像中执行 `playwright install --with-deps` 并安装所需系统库。
+- 在镜像构建阶段执行：
+  - `python -m playwright install --with-deps chromium`（或全部浏览器）。
+  - 安装 curl（供 HEALTHCHECK 使用）。
+  - 若切换非 root 用户，确保浏览器与缓存目录（如 /ms-playwright、/home/appuser/.cache）权限正确。
+- 可选优化：
+  - 设置环境变量 `PLAYWRIGHT_BROWSERS_PATH` 与 `PLAYWRIGHT_DOWNLOAD_HOST`（国内源可选）。
+  - 多阶段构建、缓存 pip 依赖、减少镜像体积。
+
+### ✅ 检查清单
+- [ ] 镜像可构建成功，且运行时 uvicorn 正常启动。
+- [ ] GET /api/v1/announcements/{code} 可返回数据。
+- [ ] POST /api/v1/announcements/{code}/sum 可执行（Playwright 能打开页面并提取 PDF/正文）。
+- [ ] HEALTHCHECK 正常（curl 可用）。
+- [ ] 非 root 用户运行无权限问题（Playwright 浏览器可启动）。
+- [ ] 中国大陆网络环境下具备可选加速配置（如 apt 源、Playwright 下载源）。
+
+### ⚠️ 注意事项
+- 若使用 python:slim 系列，需安装 Playwright 依赖（如 libnss3、libgbm、libgtk-3-0、libdrm、libasound2 等）。
+- pdfplumber 依赖 Pillow，可能需要系统库（zlib、libjpeg 等）。
+- 若需要渲染中文或处理特殊 PDF，建议安装中文字体包（如 `fonts-noto-cjk`）。
+
+### 📊 当前状态
+❌ **待开发** - 需要审阅现有 Dockerfile 并补充依赖与安装步骤，完成验证与测试。
