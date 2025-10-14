@@ -43,7 +43,7 @@ RUN set -eux \
     && python -m playwright install chromium \
     && mkdir -p /ms-playwright \
     && sed -i 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
-    && locale-gen \
+    && locale-gen
 
 # 复制应用代码
 COPY app/ ./app/
