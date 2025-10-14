@@ -1,5 +1,5 @@
-# 使用 Ubuntu 24.04 作为基础镜像，仅支持 Ubuntu
-FROM ubuntu:24.04
+# 基于官方 Python 3.12 镜像
+FROM python:3.12
 
 # 设置工作目录
 WORKDIR /app
@@ -18,8 +18,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ARG UBUNTU_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
 
 RUN set -eux \
-    && sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
-    && sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/deb.debian.com/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         curl ca-certificates \

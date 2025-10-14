@@ -41,10 +41,13 @@ bash start.sh
 ### Docker 部署
 ```bash
 # 构建镜像
-docker build -t stock-announcement-api .
+
+# 构建 Docker 镜像
+docker build --platform linux/amd64 -t ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest .
+docker push ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest
 
 # 运行容器
-docker run -p 8000:8000 stock-announcement-api
+docker run -d -p 8000:8000 --name quoted-com-insight ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest
 
 # 或使用 docker-compose
 docker-compose up -d
