@@ -1,48 +1,55 @@
-# 使用Python 3.12官方镜像作为基础镜像
-FROM python:3.12-slim
+# 使用 Ubuntu 24.04 作为基础镜像，仅支持 Ubuntu
+FROM ubuntu:24.04
 
 # 设置工作目录
 WORKDIR /app
 
-# 环境变量：Python、时区、中文本地化、Playwright浏览器路径
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
+# 环境变量：非交互安装、时区、中文本地化、Playwright 与 PIP 国内加速
+ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Shanghai \
     LANG=zh_CN.UTF-8 \
     LC_ALL=zh_CN.UTF-8 \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TIMEOUT=60
 
-# 安装系统依赖：
-# - curl: 健康检查
-# - locales/tzdata: 本地化与时区
-# - fonts-noto-cjk: 中文字体
-# - Playwright 运行依赖（Chromium 所需库）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
-    locales tzdata \
-    fonts-noto-cjk \
-    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
-    libasound2 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0 libdrm2 libxkbcommon0 \
-    libxshmfence1 libxfixes3 libxext6 libxi6 libxtst6 libglib2.0-0 libx11-6 libx11-xcb1 libxcb1 libxss1 \
+# 配置国内 Ubuntu APT 镜像（默认清华镜像，可通过 --build-arg UBUNTU_MIRROR_HOST=xxx 覆盖）
+ARG UBUNTU_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
+
+RUN set -eux \
+    && sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+        locales tzdata \
+        fonts-noto-cjk \
+        python3 python3-pip python3-venv \
+        libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+        libasound2t64 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0 libdrm2 libxkbcommon0 \
+        libxshmfence1 libxfixes3 libxext6 libxi6 libxtst6 libglib2.0-0 libx11-6 libx11-xcb1 libxcb1 libxss1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 生成中文本地化
-RUN sed -i 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen && \
-    locale-gen
+# 创建并激活虚拟环境（避免 PEP 668 系统级 pip 限制）
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# 复制并安装Python依赖
+# 复制并安装Python依赖（预下载 wheels 离线安装，prefer-binary；在 venv 中执行）
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 预安装 Playwright 浏览器与系统依赖（Chromium），并准备浏览器缓存目录
-RUN python -m playwright install --with-deps chromium && \
-    mkdir -p /ms-playwright
+RUN set -eux \
+    && pip install -r requirements.txt \
+    && python -m playwright install chromium \
+    && mkdir -p /ms-playwright \
+    && sed -i 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen \
 
 # 复制应用代码
 COPY app/ ./app/
 
 # 创建非root用户并赋权（确保Playwright浏览器与应用目录可写）
-RUN adduser --disabled-password --gecos '' appuser && \
+RUN useradd -m -s /bin/bash appuser && \
     chown -R appuser:appuser /app /ms-playwright
 USER appuser
 
