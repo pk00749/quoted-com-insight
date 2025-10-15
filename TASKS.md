@@ -166,6 +166,7 @@
   - 健康检查依赖 curl 已安装可用。
   - 非 root 用户能正常运行 Playwright（浏览器文件路径可写）。
   - 时区、编码及中文字体（如需要）配置。
+  - 配置国内 APT 源以加速依赖安装。
 
 ### 💻 技术实现要点
 - 选择合适基础镜像：
@@ -175,25 +176,13 @@
   - `python -m playwright install --with-deps chromium`（或全部浏览器）。
   - 安装 curl（供 HEALTHCHECK 使用）。
   - 若切换非 root 用户，确保浏览器与缓存目录（如 /ms-playwright、/home/appuser/.cache）权限正确。
+  - 配置国内 APT 源以加速依赖安装。
 - 可选优化：
-  - 设置环境变量 `PLAYWRIGHT_BROWSERS_PATH` 与 `PLAYWRIGHT_DOWNLOAD_HOST`（国内源可选）。
-  - 多阶段构建、缓存 pip 依赖、减少镜像体积。
+  - 使用虚拟环境（venv）隔离 Python 依赖，避免系统级安装限制。
+  - 清理构建缓存，减小镜像体积。
 
-### ✅ 检查清单
-- [ ] 镜像可构建成功，且运行时 uvicorn 正常启动。
-- [ ] GET /api/v1/announcements/{code} 可返回数据。
-- [ ] POST /api/v1/announcements/{code}/sum 可执行（Playwright 能打开页面并提取 PDF/正文）。
-- [ ] HEALTHCHECK 正常（curl 可用）。
-- [ ] 非 root 用户运行无权限问题（Playwright 浏览器可启动）。
-- [ ] 中国大陆网络环境下具备可选加速配置（如 apt 源、Playwright 下载源）。
-
-### ⚠️ 注意事项
-- 若使用 python:slim 系列，需安装 Playwright 依赖（如 libnss3、libgbm、libgtk-3-0、libdrm、libasound2 等）。
-- pdfplumber 依赖 Pillow，可能需要系统库（zlib、libjpeg 等）。
-- 若需要渲染中文或处理特殊 PDF，建议安装中文字体包（如 `fonts-noto-cjk`）。
-
-### 📊 当前状态
-❌ **待开发** - 需要审阅现有 Dockerfile 并补充依赖与安装步骤，完成验证与测试。
+### ✅ 状态
+- 已完成
 
 ---
 
@@ -225,7 +214,7 @@
      - 校验参数：signature、timestamp、nonce、echostr
      - 服务端按规则对 token、timestamp、nonce 做 SHA1，匹配 signature，通过后原样返回 echostr
    - POST /wechat/callback：接收用户消息
-     - 按公众号配置的加密模式解析 XML 消息体，提取 MsgType=text、Content
+     - 按公众号配置的加密模式解析 XML 消消息体，提取 MsgType=text、Content
      - 业务处理后返回被动回复 XML（或使用客服消息接口主动推送）
 
 ### 🔤 消息与解析规范（文本）
