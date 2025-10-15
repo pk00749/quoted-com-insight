@@ -1,5 +1,5 @@
-# 基于官方 Python 3.12 镜像
-FROM python:3.12
+# 使用 Ubuntu 24.04 作为基础镜像，仅支持 Ubuntu
+FROM ubuntu:24.04
 
 # 设置工作目录
 WORKDIR /app
@@ -17,9 +17,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # 配置国内 Ubuntu APT 镜像（默认清华镜像，可通过 --build-arg UBUNTU_MIRROR_HOST=xxx 覆盖）
 ARG UBUNTU_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
 
-RUN set -eux \
-    && sed -i 's/deb.debian.com/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
-    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
+RUN set -eux; \
+    sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         curl ca-certificates \

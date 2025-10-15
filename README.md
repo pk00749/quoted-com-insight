@@ -33,7 +33,7 @@ pip install -r requirements.txt
 ```bash
 # 开发模式
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 # 或使用启动脚本
 bash start.sh
 ```
@@ -44,6 +44,8 @@ bash start.sh
 
 # 构建 Docker 镜像
 docker build --platform linux/amd64 -t ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest .
+
+# 推送镜像到腾讯云容器服务
 docker push ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest
 
 # 运行容器
