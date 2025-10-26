@@ -48,6 +48,9 @@ docker build --platform linux/amd64 -t ccr.ccs.tencentyun.com/quoted-com-insight
 # 推送镜像到腾讯云容器服务
 docker push ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest
 
+# 拉取镜像
+docker pull ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest
+
 # 运行容器
 docker run -d -p 8000:8000 --name quoted-com-insight ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight:latest
 

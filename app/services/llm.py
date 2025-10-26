@@ -21,13 +21,3 @@ def llm_by_api(announcement_contents):
 
     if response.status_code == HTTPStatus.OK:
         return response.output.choices[0]["message"]["content"]
-
-if __name__ == "__main__":
-    llm_response = llm_by_api("""合肥城建发展股份有限公司（以下简称“公司”）于 2025 年 9 月 8 日召开的
-    # # 第八届董事会第二十二次会议和第八届监事会第十八次会议审议通过了《关于全
-    # # 资子公司对外投资的议案》，公司全资子公司安徽琥珀物业服务有限公司拟与合
-    # # 肥市中房物业管理有限公司共同投资设立合肥慧城运营管理有限公司（暂定名，
-    # # 以工商部门核准为准，以下简称“慧城管理”），具体内容详见公司 2025 年 9 月
-    # # 9 日在巨潮资讯网披露的《关于全资子公司对外投资的公告》（公告编
-    # # 号:2025073）""")
-    print(llm_response)
