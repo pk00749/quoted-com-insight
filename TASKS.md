@@ -258,3 +258,46 @@
 
 ### 📊 当前状态
 ❌ **待开发** - 本任务仅形成实施文档与流程，尚未编写回调控制器与消息编解码代码。
+
+---
+
+## 任务6: 使用 Docker Compose 部署 Nginx 与应用服务（仅文档，先不实现代码）
+
+**目标**: 通过 docker compose 同时部署反向代理（Nginx，支持 SSL）与本服务容器，提供对外 HTTPS 访问与到应用的反向代理。
+
+### 📁 文件与目录规划（预留）
+- `docker-compose.yml`（或 `compose.yaml`）：定义 nginx 与 app 两个服务
+- `deploy/nginx/nginx.conf`：Nginx 主配置（含 HTTPS 与反向代理）
+- `certs/`：存放 SSL 证书与私钥（预留，不随仓库提交）
+  - `fullchain.pem`（或 `server.crt`）
+  - `privkey.pem`（或 `server.key`）
+
+### 🧩 Compose 设计（预案）
+- 网络：单一自定义网络 `webnet`，nginx 与 app 互通
+- 服务：
+  - app：
+    - 基于当前项目 Dockerfile 构建或使用已发布镜像
+    - 暴露 8000 端口（仅容器内可见），健康检查指向 `/health`
+  - nginx：
+    - 依赖 app 启动，映射主机 80、443 端口
+    - 只读挂载 `deploy/nginx/nginx.conf -> /etc/nginx/nginx.conf`
+    - 只读挂载 `certs -> /etc/nginx/certs`（证书目录，预留）
+
+### ⚙️ Nginx 配置要点（nginx.conf 预留规范）
+- upstream `app` 指向 `app:8000`
+- HTTP 80：全量 301 跳转到 HTTPS
+- HTTPS 443：
+  - `ssl_certificate /etc/nginx/certs/fullchain.pem;`
+  - `ssl_certificate_key /etc/nginx/certs/privkey.pem;`
+  - 开启 `http2`、合理的 `ssl_protocols` 与 `ssl_ciphers`
+  - 反向代理到 `http://app`，传递头部：`Host`、`X-Forwarded-For`、`X-Forwarded-Proto`
+  - WebSocket 支持：`Upgrade` 与 `Connection` 头
+
+### 🧪 验收清单
+- [ ] `docker compose up -d` 后两个容器均为 healthy
+- [ ] 访问 `http://` 自动跳转 `https://`
+- [ ] 证书挂载后 HTTPS 正常握手
+- [ ] `https://<domain>/health` 经 Nginx 反代可达 app 健康检查
+
+### 📊 当前状态
+❌ **待开发** - 仅完善文档与目录规划，暂不提交 `nginx.conf` 与 `docker-compose.yml` 具体实现。

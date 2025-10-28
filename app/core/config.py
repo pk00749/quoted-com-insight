@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # 日志配置
     log_level: str = "INFO"
 
+    # 微信回调配置
+    wechat_token: str = "your-token"  # 微信服务器签名校验用 Token
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # 忽略额外的环境变量
@@ -61,3 +64,5 @@ if _yaml:
         settings.announcement_time_range_days = int(_yaml.get("announcement_time_range_days", settings.announcement_time_range_days))
     if "pdf_content_max_chars" in _yaml and not os.getenv("PDF_CONTENT_MAX_CHARS"):
         settings.pdf_content_max_chars = int(_yaml.get("pdf_content_max_chars", settings.pdf_content_max_chars))
+    if "wechat_token" in _yaml and not os.getenv("WECHAT_TOKEN"):
+        settings.wechat_token = str(_yaml.get("wechat_token", settings.wechat_token))

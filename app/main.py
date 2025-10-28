@@ -5,6 +5,7 @@ import uvicorn
 import logging
 
 from app.routers import announcements, system
+from app.routers import wechat  # 新增：引入微信路由
 from app.core.exceptions import create_exception_handler
 
 # 配置日志
@@ -35,6 +36,7 @@ app.add_exception_handler(HTTPException, create_exception_handler)
 # 注册路由
 app.include_router(announcements.router, prefix="/api/v1", tags=["公告信息"])
 app.include_router(system.router, prefix="/api/v1", tags=["系统"])
+app.include_router(wechat.router, tags=["微信"])  # 新增：微信回调接口（不加前缀，路径为 /wechat/callback）
 
 @app.get("/")
 async def root():
