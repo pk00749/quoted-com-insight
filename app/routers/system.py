@@ -1,6 +1,5 @@
 from fastapi import APIRouter
 from datetime import datetime
-import akshare as ak
 
 from ..models import BaseResponse
 from ..core.config import settings

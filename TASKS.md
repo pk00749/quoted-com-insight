@@ -300,4 +300,6 @@
 - [ ] `https://<domain>/health` 经 Nginx 反代可达 app 健康检查
 
 ### 📊 当前状态
-❌ **待开发** - 仅完善文档与目录规划，暂不提交 `nginx.conf` 与 `docker-compose.yml` 具体实现。
+✅ **已完成** - 已提交 docker-compose.yml 与 deploy/nginx/nginx.conf，证书与微信直通路径已配置（详见下方“任务6（更新）”）。
+
+---
