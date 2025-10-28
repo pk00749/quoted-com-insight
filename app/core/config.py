@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # 微信回调配置
-    wechat_token: str = "your-token"  # 微信服务器签名校验用 Token
+    wechat_token: str = "yorkhxli20251028"  # 微信服务器签名校验用 Token
 
     class Config:
         env_file = ".env"
