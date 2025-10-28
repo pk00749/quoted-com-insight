@@ -168,7 +168,7 @@ class AnnouncementService:
             for ann in announcements:
                 content = await self._extract_announcement_content(ann.url)
                 single_summary += llm_by_api(content)+"\n" if content else ""
-                logger.info(f"single sum: {single_summary}")
+                # logger.info(f"single sum: {single_summary}")
 
             # 3. 预留LLM调用接口，单条总结与最终汇总
             final_summary = llm_by_api(single_summary)

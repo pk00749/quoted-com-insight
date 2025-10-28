@@ -4,11 +4,13 @@ import hashlib
 import time
 import re
 import xml.etree.ElementTree as ET
+import logging
 
 from ..core.config import settings
 from ..services.announcement_service import announcement_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _sign(token: str, timestamp: str, nonce: str) -> str:
@@ -115,5 +117,6 @@ async def wechat_message(
 
     # 5) 构造被动回复
     xml = _build_text_reply(from_user, to_user, final_text)
+    logger.info("Reply XML:", xml)
     return Response(content=xml, media_type="application/xml; charset=utf-8")
 

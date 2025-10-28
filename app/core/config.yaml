@@ -1,6 +1,6 @@
 # 应用运行时可配置参数
 # 公告时间范围（单位：天）
-announcement_time_range_days: 10
+announcement_time_range_days: 1
 
 # PDF正文截断长度（单位：字符/字）
 pdf_content_max_chars: 500
