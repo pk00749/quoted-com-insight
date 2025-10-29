@@ -99,6 +99,14 @@ async def wechat_message(
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
+    if content == "subscribe":
+        reply = (
+            "欢迎关注股票公告信息服务！\n"
+            "请发送6位A股代码（如 000001）获取该股票近期公告的AI智能总结。"
+        )
+        xml = _build_text_reply(from_user, to_user, reply)
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
     # 3) 解析股票代码（6位数字）
     m = re.search(r"\b(\d{6})\b", content)
     if not m:
