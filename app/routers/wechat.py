@@ -93,15 +93,29 @@ async def wechat_message(
     to_user = data.get("ToUserName") or ""
     msg_type = data.get("MsgType") or ""
     content = (data.get("Content") or "").strip()
+    event = data.get("Event") or ""
+    msg_id = data.get("MsgId") or ""
+    msg_data_id = data.get("MsgDataId") or ""
 
     if msg_type.lower() != "text":
         reply = "暂仅支持文本消息，请发送6位A股代码，如 000001"
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
+    if content == "帮助" or content == "help":
+        reply = (
+            f"Event：{event}\n"
+            f"From User: {from_user}\n"
+            f"To User: {to_user}\n"
+            f"Msg ID: {msg_id}\n"
+            f"Msg Data ID: {msg_data_id}\n"
+        )
+        xml = _build_text_reply(from_user, to_user, reply)
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
     if content == "subscribe":
         reply = (
-            "欢迎关注股票公告信息服务！\n"
+            f"欢迎 {from_user} 关注股票公告信息服务！\n"
             "请发送6位A股代码（如 000001）获取该股票近期公告的AI智能总结。"
         )
         xml = _build_text_reply(from_user, to_user, reply)
@@ -127,4 +141,3 @@ async def wechat_message(
     xml = _build_text_reply(from_user, to_user, final_text)
     logger.info("Reply XML:", xml)
     return Response(content=xml, media_type="application/xml; charset=utf-8")
-
