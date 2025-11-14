@@ -157,7 +157,7 @@ async def wechat_message(
     # 直接查询股票代码
     m = re.search(r"\b(\d{6})\b", content)
     if not m:
-        xml = _build_text_reply(from_user, to_user, "请输入6位A股代码，如 000001 或使用 help")
+        xml = _build_text_reply(from_user, to_user, "请输入6位A股代码，如 000001")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     stock_code = m.group(1)

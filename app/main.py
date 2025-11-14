@@ -12,33 +12,40 @@ from app.routers import wechat  # 新增：引入微信路由
 from app.core.exceptions import create_exception_handler
 from app.services.subscription_service import subscription_service
 from app.services.announcement_service import announcement_service
+from app.core.config import settings  # 新增：引入配置，用于定时任务时间
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def _seconds_until_next_9am_china() -> float:
-    tz = ZoneInfo("Asia/Shanghai")
-    now = datetime.now(tz)
-    target = now.replace(hour=9, minute=0, second=0, microsecond=0)
-    if now >= target:
-        target = target + timedelta(days=1)
-    return (target - now).total_seconds()
+async def _seconds_until_next_config_time() -> float:
+    """计算距离下一个配置的北京时间 HH:MM 的秒数"""
+    try:
+        tz = ZoneInfo("Asia/Shanghai")
+        now = datetime.now(tz)
+        hh, mm = [int(x) for x in settings.subscription_refresh_time.split(":")]
+        target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if now >= target:
+            target += timedelta(days=1)
+        return (target - now).total_seconds()
+    except Exception as e:
+        logger.warning(f"解析 subscription_refresh_time 失败: {e}，回退24小时")
+        return 24 * 3600
 
 
 async def _run_daily_summaries_loop():
-    # 首次等待至下一个北京时间09:00
+    # 首次等待至下一个配置的时间
     try:
-        delay = await _seconds_until_next_9am_china()
-        logger.info(f"定时任务将在 {delay:.0f}s 后(北京时间09:00)运行")
+        delay = await _seconds_until_next_config_time()
+        logger.info(f"定时任务将在 {delay:.0f}s 后(北京时间 {settings.subscription_refresh_time})运行")
         await asyncio.sleep(delay)
     except Exception as e:
         logger.warning(f"计算首次定时延迟失败: {e}")
 
     while True:
         try:
-            logger.info("开始执行09:00定时任务：汇总订阅股票公告")
+            logger.info(f"开始执行定时任务({settings.subscription_refresh_time})：汇总订阅股票公告")
             rows = subscription_service.all_rows()
             total_codes = 0
             for _, codes in rows:
@@ -52,10 +59,10 @@ async def _run_daily_summaries_loop():
             logger.info(f"定时任务完成，更新 {total_codes} 个股票的JSON缓存")
         except Exception as e:
             logger.exception(f"定时任务运行异常: {e}")
-        # 等待到下一次09:00
+        # 等待到下一个配置时间
         try:
-            delay = await _seconds_until_next_9am_china()
-            logger.info(f"下次定时任务将在 {delay:.0f}s 后运行")
+            delay = await _seconds_until_next_config_time()
+            logger.info(f"下次定时任务将在 {delay:.0f}s 后(北京时间 {settings.subscription_refresh_time})运行")
             await asyncio.sleep(delay)
         except Exception as e:
             logger.warning(f"计算下次定时延迟失败: {e}，回退为24小时")

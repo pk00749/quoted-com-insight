@@ -33,6 +33,15 @@ class SubscriptionService:
                 )
                 """
             )
+            # 新增：每个股票代码对应的最近 summary 更新时间（全局，不按用户区分）
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS subscription_summaries (
+                    stock_code TEXT PRIMARY KEY,
+                    summary_updated_datetime TEXT
+                )
+                """
+            )
             conn.commit()
 
     @contextmanager
@@ -130,10 +139,18 @@ class SubscriptionService:
         return os.path.join(SUMMARY_DIR, fname)
 
     def save_summary(self, stock_code: str, data: Dict):
+        # 保存总结文件
         path = self.summary_path(stock_code)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        # 更新 summary 更新时间
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO subscription_summaries(stock_code, summary_updated_datetime) VALUES(?,?)\n                 ON CONFLICT(stock_code) DO UPDATE SET summary_updated_datetime=excluded.summary_updated_datetime",
+                (stock_code, self._now_iso()),
+            )
+            conn.commit()
 
     def load_summary_text(self, stock_code: str) -> str:
         path = self.summary_path(stock_code)
@@ -147,6 +164,19 @@ class SubscriptionService:
         except Exception:
             return ""
 
+    def get_summary_timestamps(self, codes: List[str]) -> Dict[str, str]:
+        if not codes:
+            return {}
+        placeholders = ",".join(["?"] * len(codes))
+        with self._conn() as conn:
+            cur = conn.execute(
+                f"SELECT stock_code, summary_updated_datetime FROM subscription_summaries WHERE stock_code IN ({placeholders})",
+                codes,
+            )
+            mapping = {}
+            for sc, ts in cur.fetchall():
+                mapping[sc] = ts or ""
+            return mapping
+
 
 subscription_service = SubscriptionService()
-
