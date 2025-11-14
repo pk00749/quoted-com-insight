@@ -102,7 +102,6 @@ async def wechat_message(
         xml = _build_text_reply(from_user, to_user, "暂仅支持文本消息，请发送6位A股代码，如 000001")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-
     if content == "admin":
         reply = (
             f"Event：{event}\n"
@@ -121,17 +120,21 @@ async def wechat_message(
             "1) 发送 6 位股票代码获取近期公告总结\n"
             "2) addXXXXXX 加入订阅 (例 add600000)\n"
             "3) delXXXXXX 取消订阅 (例 del600000)\n"
-            "4) subscribe 获取欢迎信息"
+            "4) subscribe 查看订阅列表"
         )
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-    # subscribe 欢迎
-    if content.lower() == "subscribe":
-        reply = (
-            f"欢迎 {from_user} 使用公告信息服务！\n"
-            "发送 6 位A股代码获取公告总结，或使用 addXXXXXX / delXXXXXX 管理订阅。"
-        )
+    # subscribe / list / my 查询订阅列表（任务8实现）
+    if content.lower() in ("subscribe", "list", "my"):
+        codes = subscription_service.list_codes(from_user)
+        if not codes:
+            reply = "当前未订阅任何股票，发送 add600000 开始订阅"
+        else:
+            show = codes[:100]
+            reply = f"订阅列表({len(codes)}): " + ", ".join(show)
+            if len(codes) > 100:
+                reply += f"\n其余 {len(codes)-100} 个已省略"
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
