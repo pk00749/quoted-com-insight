@@ -8,6 +8,7 @@ import logging
 
 from ..core.config import settings
 from ..services.announcement_service import announcement_service
+from ..services.subscription_service import subscription_service  # 新增：订阅服务
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -98,11 +99,11 @@ async def wechat_message(
     msg_data_id = data.get("MsgDataId") or ""
 
     if msg_type.lower() != "text":
-        reply = "暂仅支持文本消息，请发送6位A股代码，如 000001"
-        xml = _build_text_reply(from_user, to_user, reply)
+        xml = _build_text_reply(from_user, to_user, "暂仅支持文本消息，请发送6位A股代码，如 000001")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-    if content == "帮助" or content == "help":
+
+    if content == "admin":
         reply = (
             f"Event：{event}\n"
             f"From User: {from_user}\n"
@@ -113,31 +114,66 @@ async def wechat_message(
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-    if content == "subscribe":
+    # 帮助
+    if content == "帮助" or content == "help":
         reply = (
-            f"欢迎 {from_user} 关注股票公告信息服务！\n"
-            "请发送6位A股代码（如 000001）获取该股票近期公告的AI智能总结。"
+            "使用说明:\n"
+            "1) 发送 6 位股票代码获取近期公告总结\n"
+            "2) addXXXXXX 加入订阅 (例 add600000)\n"
+            "3) delXXXXXX 取消订阅 (例 del600000)\n"
+            "4) subscribe 获取欢迎信息"
         )
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-    # 3) 解析股票代码（6位数字）
+    # subscribe 欢迎
+    if content.lower() == "subscribe":
+        reply = (
+            f"欢迎 {from_user} 使用公告信息服务！\n"
+            "发送 6 位A股代码获取公告总结，或使用 addXXXXXX / delXXXXXX 管理订阅。"
+        )
+        xml = _build_text_reply(from_user, to_user, reply)
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
+    # 订阅添加
+    m_add = re.match(r"^add(\d{6})$", content)
+    if m_add:
+        code = m_add.group(1)
+        ok, msg = subscription_service.add_code(from_user, code)
+        xml = _build_text_reply(from_user, to_user, msg)
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
+    # 订阅删除
+    m_del = re.match(r"^del(\d{6})$", content)
+    if m_del:
+        code = m_del.group(1)
+        ok, msg = subscription_service.del_code(from_user, code)
+        xml = _build_text_reply(from_user, to_user, msg)
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
+    # 直接查询股票代码
     m = re.search(r"\b(\d{6})\b", content)
     if not m:
-        reply = "请输入6位A股代码，如 000001"
-        xml = _build_text_reply(from_user, to_user, reply)
+        xml = _build_text_reply(from_user, to_user, "请输入6位A股代码，如 000001 或使用 help")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     stock_code = m.group(1)
 
-    # 4) 调用内部服务进行总结
+    # 优先读取缓存
+    cached = subscription_service.load_summary_text(stock_code)
+    if cached:
+        xml = _build_text_reply(from_user, to_user, cached[:1800])  # 控制长度
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
+    # 缓存无则实时生成
     try:
         result = await announcement_service.summarize_announcements(stock_code)
-        final_text = result.get("content") or result.get("summary") or "生成总结失败，请稍后重试"
+        subscription_service.save_summary(stock_code, result)
+        subscription_service.touch(from_user)
+        final_text = result.get("content") or result.get("summary") or "生成总结失败"
     except Exception as ex:
-        final_text = f"服务暂不可用，请稍后重试。错误：{ex}"
+        final_text = f"服务暂不可用：{ex}"
 
-    # 5) 构造被动回复
-    xml = _build_text_reply(from_user, to_user, final_text)
-    logger.info("Reply XML:", xml)
+    xml = _build_text_reply(from_user, to_user, final_text[:1800])
+    logger.info("Reply XML: %s", xml)
     return Response(content=xml, media_type="application/xml; charset=utf-8")
