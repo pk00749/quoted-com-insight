@@ -29,6 +29,7 @@ RUN set -eux; \
         libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
         libasound2t64 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0 libdrm2 libxkbcommon0 \
         libxshmfence1 libxfixes3 libxext6 libxi6 libxtst6 libglib2.0-0 libx11-6 libx11-xcb1 libxcb1 libxss1 \
+        sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建并激活虚拟环境（避免 PEP 668 系统级 pip 限制）
