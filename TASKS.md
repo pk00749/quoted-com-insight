@@ -398,3 +398,116 @@
 
 ### 📊 当前状态
 ❌ 待开发 - 文档已添加，尚未编写实现代码。
+
+---
+
+## 任务10: GitHub Actions CI/CD 集成（仅文档，先不实现代码）
+
+### 📋 需求描述
+基于 GitHub Actions 搭建自动化流水线，实现以下流程：
+1. 代码提交（push 到 main 或打 tag）触发工作流。
+2. 执行单元测试与基础质量检查（pytest、lint 可选）。
+3. 构建 Docker 镜像（含版本标签与最新标签）。
+4. 登录腾讯云镜像仓库 ccr.ccs.tencentyun.com 并推送镜像。
+5. 远程腾讯云轻量服务器拉取最新镜像并使用 docker compose 重启服务（零停机或最小停机）。
+
+### 🧱 镜像与标签规范
+- 基础仓库：`ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight`
+- 标签策略：
+  - `latest` 始终指向主干最新构建
+  - `v<SEMVER>`（如手动打 tag v1.2.0 时生成对应版本）
+  - `build-<YYYYMMDD>-<SHORT_SHA>` 便于回溯（例如 `build-20251117-a1b2c3d`）
+
+### 🔐 凭证与安全
+- 使用 GitHub Actions Secrets：
+  - `TCR_USERNAME` / `TCR_PASSWORD` 登录腾讯云镜像仓库
+  - `SERVER_HOST` 远程轻量服务器公网 IP 或域名
+  - `SERVER_SSH_USER` SSH 用户（建议独立 deploy 用户）
+  - `SERVER_SSH_KEY` 私钥（使用 Actions 的 `ssh-agent` 载入）
+- 可选：使用 OIDC + 临时密钥（若后续升级）。
+
+### ⚙️ 工作流示例步骤（逻辑说明）
+1. 触发条件：
+   - `on: push` 分支 `main`
+   - `on: push` tags 匹配 `v*`
+2. 预检：checkout 代码、设置 Python、安装依赖、运行测试。
+3. 构建镜像：`docker build -t $IMAGE_FULL_NAME .`
+4. 标记多标签：`docker tag` 为 `latest` 与 `build-<DATE>-<SHA>`，若存在 tag 事件再加版本标签。
+5. 登录并推送：`docker login ccr.ccs.tencentyun.com` 后 `docker push` 各标签。
+6. 远程部署：
+   - 方式A（SSH 直接执行）：使用 `ssh` 到服务器运行：
+     ```
+     docker login ccr.ccs.tencentyun.com -u $TCR_USERNAME -p $TCR_PASSWORD
+     cd /opt/quoted-com-insight
+     docker compose pull
+     docker compose up -d --remove-orphans
+     docker image prune -f
+     ```
+   - 方式B（自托管 Runner）：在服务器安装自托管 runner，省去 SSH；部署 job 在本地执行 pull + 重启。
+7. 通知（可选）：构建失败/成功发送企业微信或邮件。
+
+### 🧪 验收清单
+- [ ] push 到 main 自动触发工作流并成功构建与推送镜像。
+- [ ] tag vX.Y.Z 触发构建并产出对应版本镜像。
+- [ ] 远程服务器 docker compose 自动拉取并重启服务，访问 /health 返回 200。
+- [ ] 镜像标签规范存在：latest、build-<DATE>-<SHA>、vX.Y.Z（在 tag 构建时）。
+- [ ] 失败场景（测试失败/推送失败）工作流自动终止并输出错误日志。
+- [ ] Secrets 未在日志中泄露（敏感信息打码）。
+
+### 🧩 未来扩展（规划）
+- 并行构建多架构（amd64 + arm64）。
+- 使用缓存加速（GitHub Actions cache + Docker layer caching）。
+- 引入安全扫描（Trivy）与依赖漏洞检测。
+- 灰度发布（双 compose 文件或 blue-green）。
+- 加入自动回滚逻辑（健康检查失败回滚到上一个成功版本）。
+
+### ⚠️ 注意事项
+- 轻量服务器需预装：docker 与 docker compose plugin。
+- 若使用 SSH，需限制密钥权限并禁用 root 直接登录。
+- 构建 Playwright 浏览器镜像层可能较大，应考虑多阶段构建和层缓存。
+- 避免频繁 push 浪费带宽，可在非 main 分支只跑测试不推镜像。
+
+### 📊 当前状态
+❌ 待开发 - 仅文档，暂未编写 GitHub Actions YAML 与部署脚本
+
+---
+
+## 任务11: 订阅服务与配置加载行为优化（仅文档，先不实现代码）
+
+### 📋 需求描述
+1. 优化 subscription_service.py 初始化逻辑：
+   - 当前启动时会始终执行数据库结构初始化。
+   - 新要求：若 data/ 目录下已存在 subscriptions.db 文件，则跳过建表初始化步骤（除非需迁移）。
+   - 若文件不存在才执行建库与建表。
+   - 需考虑后续表结构演进（预留版本号或迁移机制文档说明）。
+2. 优化 config.py 配置加载说明：
+   - 优先使用环境变量（使用 pydantic BaseSettings 原生能力）。
+   - 若环境变量未设置，再使用 config.py 中的默认设置值（类字段默认）。
+   - YAML config.yaml 作为最后覆盖来源，但仅在对应环境变量缺失时应用，其行为需在文档中明确。
+   - 增加可选：输出启动时的最终配置来源说明（例如 debug 模式下打印每个关键字段的取值来源：env / default / yaml）。
+
+### 🔧 设计要点
+- subscription_service.py：
+  - 初始化入口添加文件存在性判断：os.path.exists(DB_PATH)。
+  - 若存在则直接返回；若不存在执行原有 _init_db()。
+  - 预留迁移：可在文件中添加一个 meta/version 表；若未来版本升级需执行 ALTER TABLE，可根据版本号进行迁移。
+- config.py：
+  - 保持现有加载顺序：BaseSettings (env) -> YAML fallback（仅无 env 时覆盖）。
+  - 增加一个函数或日志块：在 debug 模式下打印关键配置最终值与来源。
+  - 防止 YAML 覆盖已经由环境变量设定的值。
+
+### 🧪 验收清单
+- [ ] 在 data/subscriptions.db 已存在情况下启动应用不再重复执行建表（日志可见“已存在，跳过初始化”）。
+- [ ] 删除 subscriptions.db 后重启可自动重新初始化并生成数据库文件。
+- [ ] 在设置环境变量 ANNOUNCEMENT_TIME_RANGE_DAYS=5 时，最终配置值为 5，且 YAML 中的不同值不覆盖。
+- [ ] 未设置环境变量且 YAML 中有 announcement_time_range_days=7 时，最终值为 7。
+- [ ] debug 模式下启动时能看到配置来源打印（可选）。
+- [ ] 不引入破坏性变更：其他已有任务功能正常。
+
+### ⚠️ 注意事项
+- 跳过初始化后仍需保证 subscription_summaries 等新表未来升级路径可扩展（建议后续引入简单迁移器）。
+- 配置来源打印需避免在生产环境输出敏感内容（如 llm_api_key）。
+- 若未来增加多阶段加载（如远程配置中心），需在此任务的文档中说明扩展点。
+
+### 📊 当前状态
+❌ 待开发 - 尚未实现代码，等待后续提交。
