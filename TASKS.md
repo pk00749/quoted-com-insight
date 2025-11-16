@@ -480,34 +480,20 @@
    - 新要求：若 data/ 目录下已存在 subscriptions.db 文件，则跳过建表初始化步骤（除非需迁移）。
    - 若文件不存在才执行建库与建表。
    - 需考虑后续表结构演进（预留版本号或迁移机制文档说明）。
-2. 优化 config.py 配置加载说明：
-   - 优先使用环境变量（使用 pydantic BaseSettings 原生能力）。
-   - 若环境变量未设置，再使用 config.py 中的默认设置值（类字段默认）。
-   - YAML config.yaml 作为最后覆盖来源，但仅在对应环境变量缺失时应用，其行为需在文档中明确。
-   - 增加可选：输出启动时的最终配置来源说明（例如 debug 模式下打印每个关键字段的取值来源：env / default / yaml）。
 
 ### 🔧 设计要点
 - subscription_service.py：
   - 初始化入口添加文件存在性判断：os.path.exists(DB_PATH)。
   - 若存在则直接返回；若不存在执行原有 _init_db()。
   - 预留迁移：可在文件中添加一个 meta/version 表；若未来版本升级需执行 ALTER TABLE，可根据版本号进行迁移。
-- config.py：
-  - 保持现有加载顺序：BaseSettings (env) -> YAML fallback（仅无 env 时覆盖）。
-  - 增加一个函数或日志块：在 debug 模式下打印关键配置最终值与来源。
-  - 防止 YAML 覆盖已经由环境变量设定的值。
 
 ### 🧪 验收清单
 - [ ] 在 data/subscriptions.db 已存在情况下启动应用不再重复执行建表（日志可见“已存在，跳过初始化”）。
 - [ ] 删除 subscriptions.db 后重启可自动重新初始化并生成数据库文件。
-- [ ] 在设置环境变量 ANNOUNCEMENT_TIME_RANGE_DAYS=5 时，最终配置值为 5，且 YAML 中的不同值不覆盖。
-- [ ] 未设置环境变量且 YAML 中有 announcement_time_range_days=7 时，最终值为 7。
-- [ ] debug 模式下启动时能看到配置来源打印（可选）。
 - [ ] 不引入破坏性变更：其他已有任务功能正常。
 
 ### ⚠️ 注意事项
 - 跳过初始化后仍需保证 subscription_summaries 等新表未来升级路径可扩展（建议后续引入简单迁移器）。
-- 配置来源打印需避免在生产环境输出敏感内容（如 llm_api_key）。
-- 若未来增加多阶段加载（如远程配置中心），需在此任务的文档中说明扩展点。
 
 ### 📊 当前状态
 ❌ 待开发 - 尚未实现代码，等待后续提交。
