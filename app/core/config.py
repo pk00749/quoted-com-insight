@@ -25,14 +25,11 @@ class Settings(BaseSettings):
     # 公告时间范围（天）与PDF正文截断长度（字）
     announcement_time_range_days: int = 10
     pdf_content_max_chars: int = 500
-    # 新增：订阅定时刷新时间 (HH:MM，北京时间)
+    # 订阅定时刷新时间 (HH:MM，北京时间)
     subscription_refresh_time: str = "09:00"
 
     # 日志配置
     log_level: str = "INFO"
-
-    # 微信回调配置
-    wechat_token: str = "xxx"  # 微信服务器签名校验用 Token
 
     class Config:
         env_file = ".env"
@@ -58,25 +55,23 @@ def _load_yaml_config() -> dict:
 # 先加载环境变量配置
 settings = Settings()
 
+# 微信回调配置
+settings.wechat_token = str(os.getenv("WECHAT_TOKEN", settings.wechat_token))
+
 # 再读取YAML，并在未显式设置对应环境变量时应用YAML值
 _yaml = _load_yaml_config()
 if _yaml:
-    # 环境变量名称按字段名大写处理
-    if "announcement_time_range_days" in _yaml and not os.getenv("ANNOUNCEMENT_TIME_RANGE_DAYS"):
-        settings.announcement_time_range_days = int(_yaml.get("announcement_time_range_days", settings.announcement_time_range_days))
-    if "pdf_content_max_chars" in _yaml and not os.getenv("PDF_CONTENT_MAX_CHARS"):
-        settings.pdf_content_max_chars = int(_yaml.get("pdf_content_max_chars", settings.pdf_content_max_chars))
-    if "wechat_token" in _yaml and not os.getenv("WECHAT_TOKEN"):
-        settings.wechat_token = str(_yaml.get("wechat_token", settings.wechat_token))
-    # 新增：订阅刷新时间配置读取（优先环境变量 SUBSCRIPTION_REFRESH_TIME）
-    if "subscription_refresh_time" in _yaml and not os.getenv("SUBSCRIPTION_REFRESH_TIME"):
-        val = str(_yaml.get("subscription_refresh_time", settings.subscription_refresh_time)).strip()
-        # 简单校验 HH:MM
-        import re
-        if re.match(r"^\d{2}:\d{2}$", val):
-            hh, mm = val.split(":")
-            if 0 <= int(hh) < 24 and 0 <= int(mm) < 60:
-                settings.subscription_refresh_time = val
-        # 若不合法保持默认并可打印警告
-        else:
-            print(f"Invalid subscription_refresh_time '{val}', use default {settings.subscription_refresh_time}")
+    settings.announcement_time_range_days = int(_yaml.get("announcement_time_range_days", settings.announcement_time_range_days))
+    settings.pdf_content_max_chars = int(_yaml.get("pdf_content_max_chars", settings.pdf_content_max_chars))
+
+    # 新增：订阅刷新时间配置读取
+    val = str(_yaml.get("subscription_refresh_time", settings.subscription_refresh_time)).strip()
+    # 简单校验 HH:MM
+    import re
+    if re.match(r"^\d{2}:\d{2}$", val):
+        hh, mm = val.split(":")
+        if 0 <= int(hh) < 24 and 0 <= int(mm) < 60:
+            settings.subscription_refresh_time = val
+    # 若不合法保持默认并可打印警告
+    else:
+        print(f"Invalid subscription_refresh_time '{val}', use default {settings.subscription_refresh_time}")
