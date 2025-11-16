@@ -19,7 +19,9 @@ class SubscriptionService:
 
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
-        self._init_db()
+        # 任务11：若数据库文件已存在则跳过初始化
+        if not os.path.exists(self.db_path):
+            self._init_db()
 
     def _init_db(self):
         with self._conn() as conn:
