@@ -5,6 +5,8 @@ import time
 import re
 import xml.etree.ElementTree as ET
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from ..core.config import settings
 from ..services.announcement_service import announcement_service
@@ -54,6 +56,24 @@ def _build_text_reply(to_user: str, from_user: str, content: str) -> str:
         f"  <Content><![CDATA[{content}]]></Content>\n"
         f"</xml>"
     )
+
+
+def _fmt_utc_iso_to_cst_min(ts: str) -> str:
+    """将UTC ISO时间转换为北京时间 YYYY-MM-DD HH:MM；若无效返回“尚未刷新”。"""
+    if not ts:
+        return "尚未刷新"
+    try:
+        # 兼容以Z结尾
+        if ts.endswith("Z"):
+            ts = ts.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(ts)
+        if not dt.tzinfo:
+            # 视为UTC
+            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        cst = dt.astimezone(ZoneInfo("Asia/Shanghai"))
+        return cst.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return "尚未刷新"
 
 
 @router.get("/wechat/callback")
@@ -125,14 +145,19 @@ async def wechat_message(
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-    # subscribe / list / my 查询订阅列表（任务8实现）
+    # subscribe / list / my 查询订阅列表（任务8 + 任务9：带更新时间显示）
     if content.lower() in ("subscribe", "list", "my"):
         codes = subscription_service.list_codes(from_user)
         if not codes:
             reply = "当前未订阅任何股票，发送 add600000 开始订阅"
         else:
-            show = codes[:100]
-            reply = f"订阅列表({len(codes)}): " + ", ".join(show)
+            # 批量查询更新时间
+            ts_map = subscription_service.get_summary_timestamps(codes)
+            lines = []
+            for sc in codes[:100]:
+                ts = _fmt_utc_iso_to_cst_min(ts_map.get(sc, ""))
+                lines.append(f"{sc} {ts}")
+            reply = "订阅列表(" + str(len(codes)) + "):\n" + "\n".join(lines)
             if len(codes) > 100:
                 reply += f"\n其余 {len(codes)-100} 个已省略"
         xml = _build_text_reply(from_user, to_user, reply)

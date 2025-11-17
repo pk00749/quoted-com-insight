@@ -474,7 +474,12 @@
 - 避免频繁 push 浪费带宽，可在非 main 分支只跑测试不推镜像。
 
 ### 📊 当前状态
-❌ 待开发 - 仅文档，暂未编写 GitHub Actions YAML 与部署脚本
+✅ 已完成 - 已新增 GitHub Actions 工作流文件：.github/workflows/cicd.yml。
+- 触发：push 到 main、push tag（v*）、手动触发（workflow_dispatch）。
+- 构建：使用 buildx + 缓存，打 latest / build-YYYYMMDD-SHA / tag 版本标签。
+- 推送：登录 TCR 并推送至 ccr.ccs.tencentyun.com/quoted-com-insight/quoted-com-insight。
+- 部署：SSH 到远程服务器，进入 $SERVER_DEPLOY_PATH（默认 /opt/quoted-com-insight），执行 docker compose pull 与 up -d。
+- 依赖 Secrets：TCR_USERNAME、TCR_PASSWORD、SERVER_HOST、SERVER_SSH_USER、SERVER_SSH_KEY、（可选）SERVER_DEPLOY_PATH。
 
 ---
 
@@ -556,3 +561,34 @@
 ### 📊 当前状态
 ❌ 待开发 - 仅文档规划，未实施具体优化。
 
+---
+
+## 任务13: 微信命令模块化与单元测试（仅文档，先不实现代码）
+
+### 需求描述
+0. 将 wechat.py 中的文本命令处理按命令拆分为独立模块文件，便于复用与单元测试。例如：
+   - app/routers/commands/wechat_subscribe.py（subscribe/list/my 查询）
+   - app/routers/commands/wechat_add.py（addXXXXXX 订阅）
+   - app/routers/commands/wechat_del.py（delXXXXXX 取消订阅）
+   - app/routers/commands/wechat_query.py（直接输入6位股票代码查询逻辑）
+1. 每个命令模块暴露统一接口（如 handle(from_user, content) -> str 或 handle(ctx) -> str），wechat.py 仅负责路由、验签与分发。
+2. 为上述命令分别编写单元测试（如 tests/test_subscribe.py、tests/test_add.py、tests/test_del.py、tests/test_query.py），通过模拟“接收微信回调后的入参/上下文”断言返回文本与副作用（订阅列表变化、缓存命中等）。
+
+### 技术实现要点（规划）
+- 模块目录建议：app/routers/commands/ 下放置各命令处理器文件；wechat.py 通过简单分发表路由到相应模块。
+- 依赖注入/隔离：处理器依赖 subscription_service 与 announcement_service；测试中使用 tmp_path 隔离数据目录，或对 summarize_announcements 使用 monkeypatch/mock，避免真实网络/IO。
+- 输出统一：处理器返回纯文本字符串，由 wechat.py 统一封装为被动回复 XML。
+
+### 验收清单
+- [ ] wechat.py 与业务处理解耦，核心逻辑迁移至独立命令模块。
+- [ ] add/del/subscribe/query 各命令模块提供可直接调用的接口并具备单测。
+- [ ] 单测覆盖主要分支：空订阅、重复订阅、删除不存在、非法代码、超过100条截断、缓存命中/未命中。
+- [ ] 单测运行不依赖外部服务（通过 mock/monkeypatch）。
+- [ ] 必须在离线环境（无网络）可完整通过所有测试用例。
+
+### 当前状态
+❌ 待开发 - 仅文档规划，尚未实施代码拆分与单元测试。
+
+### 更新记录（2025-11-17）
+- 删除历史用例 tests/test_task7.py（不再符合模块化后的测试结构）。
+- 明确单元测试重点：在离线情况下模拟“收到微信返回数据后”的处理逻辑进行断言，不进行真实 HTTP/AKShare/Playwright/LLM 调用。
