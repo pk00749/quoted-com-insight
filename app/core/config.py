@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # 日志配置
     log_level: str = "INFO"
 
+    # 微信回调配置
+    wechat_token: str = ""  # 微信服务器签名校验用 Token
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # 忽略额外的环境变量
