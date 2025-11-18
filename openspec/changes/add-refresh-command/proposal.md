@@ -21,6 +21,7 @@ risk_level: low
 - 增加 refreshXXXXXX 命令解析
 - 复用 summarize & save_summary 流程
 - 添加简单频控 (同代码60秒)
+- 不需要马上返回summarize的结果，只需要返回股票代码刷新和当前时间，如600000已刷新，2025-11-18。
 
 ## Impact
 - specs: wechat
