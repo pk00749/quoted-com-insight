@@ -31,17 +31,17 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.TCR_USERNAME }}
           password: ${{ secrets.TCR_PASSWORD }}
-#
-#      - name: Docker meta
-#        id: meta
-#        uses: docker/metadata-action@v5
-#        with:
-#          images: ${{ env.IMAGE }}
-#          tags: |
-#            type=raw,value=latest,enable={{is_default_branch}}
-#            type=raw,value=build-{{date 'YYYYMMDD'}}-{{sha}}
-#            type=ref,event=tag
-#
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=build-{{date 'YYYYMMDD'}}-{{sha}}
+            type=ref,event=tag
+
       - name: Build and Push
         uses: docker/build-push-action@v6
         with:
