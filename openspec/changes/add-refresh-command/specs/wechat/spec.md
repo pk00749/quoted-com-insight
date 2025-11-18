@@ -4,7 +4,7 @@ System SHALL support immediate summary regeneration using pattern ^refresh\d{6}$
 
 #### Scenario: Immediate refresh success
 - **WHEN** user sends refresh+code and generation succeeds
-- **THEN** cached JSON and timestamp updated and result returned
+- **THEN** system regenerates and saves summary, updates timestamp, and reply text SHALL be `<code> 已刷新，YYYY-MM-DD HH:MM` (Beijing time)
 
 #### Scenario: Refresh failure
 - **WHEN** generation fails
