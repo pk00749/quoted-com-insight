@@ -67,7 +67,6 @@ jobs:
           IMAGE: ${{ env.IMAGE }}
           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-          DEPLOY_PATH: ${{ secrets.SERVER_DEPLOY_PATH }}
         run: |
           set -eux
           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
@@ -76,7 +75,7 @@ jobs:
           export IMAGE='${IMAGE}'
           export TCR_USERNAME='${TCR_USERNAME}'
           export TCR_PASSWORD='${TCR_PASSWORD}'
-          export DEPLOY_PATH='${DEPLOY_PATH:-/opt/quoted-com-insight}'
+          export DEPLOY_PATH='/opt/quoted-com-insight'
 
           docker login ${REGISTRY} -u ${TCR_USERNAME} -p ${TCR_PASSWORD}
 
@@ -84,5 +83,4 @@ jobs:
 #          docker compose pull
 #          docker compose up -d --remove-orphans
 #          docker image prune -f || true
-#          EOF
-#
+          EOF
