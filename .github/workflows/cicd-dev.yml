@@ -60,7 +60,6 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.ID_RSA }}
-      
       - name: Deploy over SSH
         env:
           HOST: "203.195.217.95"
