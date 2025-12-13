@@ -60,28 +60,28 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.ID_RSA }}
-      - name: Deploy over SSH
-        env:
-          HOST: "203.195.217.95"
-          USER: "ubuntu"
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE: ${{ env.IMAGE }}
-          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
-          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-        run: |
-          set -eux
-          ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
-          set -eux
-          export REGISTRY='${REGISTRY}'
-          export IMAGE='${IMAGE}'
-          export TCR_USERNAME='${TCR_USERNAME}'
-          export TCR_PASSWORD='${TCR_PASSWORD}'
-          export DEPLOY_PATH='/opt/quoted-com-insight'
+#       - name: Deploy over SSH
+#         env:
+#           HOST: "203.195.217.95"
+#           USER: "ubuntu"
+#           REGISTRY: ${{ env.REGISTRY }}
+#           IMAGE: ${{ env.IMAGE }}
+#           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+#           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+#         run: |
+#           set -eux
+#           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
+#           set -eux
+#           export REGISTRY='${REGISTRY}'
+#           export IMAGE='${IMAGE}'
+#           export TCR_USERNAME='${TCR_USERNAME}'
+#           export TCR_PASSWORD='${TCR_PASSWORD}'
+#           export DEPLOY_PATH='/opt/quoted-com-insight'
 
-          docker login ${REGISTRY} -u ${TCR_USERNAME} -p ${TCR_PASSWORD}
+#           docker login ${REGISTRY} -u ${TCR_USERNAME} -p ${TCR_PASSWORD}
 
-          cd ${DEPLOY_PATH}
-#          docker compose pull
-#          docker compose up -d --remove-orphans
-#          docker image prune -f || true
-          EOF
+#           cd ${DEPLOY_PATH}
+# #          docker compose pull
+# #          docker compose up -d --remove-orphans
+# #          docker image prune -f || true
+#           EOF
