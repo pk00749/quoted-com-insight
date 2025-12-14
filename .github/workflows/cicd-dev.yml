@@ -3,7 +3,7 @@ name: CI/CD - DEV
 on:
   push:
     branches: [ "master" ]
-    tags: [ "0.0.1" ]
+    tags: [ "latest" ]
   workflow_dispatch: {}
 
 env:
@@ -39,7 +39,7 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=raw,value=0.0.1
+            type=raw,value=latest
 
       - name: Build and Push
         uses: docker/build-push-action@v6
