@@ -73,7 +73,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
           set -eux
           export REGISTRY='${{ env.REGISTRY }}'
-          export IMAGE='${IMAGE}'
+          export IMAGE='${{ env.IMAGE }}'
           export TCR_USERNAME='${{ secrets.TCR_USERNAME }}'
           export TCR_PASSWORD='${{ secrets.TCR_PASSWORD }}'
           export DEPLOY_PATH='/opt/quoted-com-insight'
