@@ -73,4 +73,6 @@ jobs:
           docker login '${{ env.REGISTRY }}' -u '${{ secrets.TCR_USERNAME }}' -p '${{ secrets.TCR_PASSWORD }}'
           cd /opt/quoted-com-insight
           docker compose pull
+          docker compose up -d --remove-orphans
+          docker image prune -f || true
           EOF
