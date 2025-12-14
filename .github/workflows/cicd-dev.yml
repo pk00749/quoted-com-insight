@@ -72,14 +72,11 @@ jobs:
           set -eux
           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
           set -eux
-          export REGISTRY='${{ env.REGISTRY }}'
-          export IMAGE='${{ env.IMAGE }}'
-          export TCR_USERNAME='${{ secrets.TCR_USERNAME }}'
-          export TCR_PASSWORD='${{ secrets.TCR_PASSWORD }}'
-          export DEPLOY_PATH='/opt/quoted-com-insight'
+          export TCR_USERNAME='${{ TCR_USERNAME }}'
+          export TCR_PASSWORD='${{ TCR_PASSWORD }}'
 
-          docker login ${{ env.REGISTRY }} -u ${{ secrets.TCR_USERNAME }} -p ${{ secrets.TCR_PASSWORD }}
-          cd ${DEPLOY_PATH}
+          docker login ${{ env.REGISTRY }} -u ${{ TCR_USERNAME }} -p ${{ TCR_PASSWORD }}
+          cd /opt/quoted-com-insight
           docker compose pull
 # #          docker compose up -d --remove-orphans
 # #          docker image prune -f || true
