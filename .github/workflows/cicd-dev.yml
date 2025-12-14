@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI/CD - DEV
 
 on:
   push:
@@ -60,19 +60,19 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.ID_RSA }}
-#       - name: Deploy over SSH
-#         env:
-#           HOST: "203.195.217.95"
-#           USER: "ubuntu"
-#           REGISTRY: ${{ env.REGISTRY }}
-#           IMAGE: ${{ env.IMAGE }}
-#           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
-#           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
-#         run: |
-#           set -eux
-#           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
-#           set -eux
-#           export REGISTRY='${REGISTRY}'
+      - name: Deploy over SSH
+        env:
+          HOST: "203.195.217.95"
+          USER: "ubuntu"
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+        run: |
+          set -eux
+          ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
+          set -eux
+          export REGISTRY='${REGISTRY}'
 #           export IMAGE='${IMAGE}'
 #           export TCR_USERNAME='${TCR_USERNAME}'
 #           export TCR_PASSWORD='${TCR_PASSWORD}'
