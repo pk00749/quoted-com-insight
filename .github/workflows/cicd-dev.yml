@@ -1,9 +1,9 @@
-name: CI/CD - DEV
+name: CI/CD - PROD
 
 on:
   push:
     branches: [ "master" ]
-    tags: [ "latest" ]
+    tags: [ "0.0.1" ]
   workflow_dispatch: {}
 
 env:
@@ -39,7 +39,7 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=0.0.1
 
       - name: Build and Push
         uses: docker/build-push-action@v6
@@ -72,13 +72,13 @@ jobs:
           set -eux
           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
           set -eux
-          export REGISTRY='${REGISTRY}'
+          export REGISTRY='${{ env.REGISTRY }}'
           export IMAGE='${IMAGE}'
-          export TCR_USERNAME='${TCR_USERNAME}'
-          export TCR_PASSWORD='${TCR_PASSWORD}'
+          export TCR_USERNAME='${{ secrets.TCR_USERNAME }}'
+          export TCR_PASSWORD='${{ secrets.TCR_PASSWORD }}'
           export DEPLOY_PATH='/opt/quoted-com-insight'
 
-          docker login ${REGISTRY} -u ${TCR_USERNAME} -p ${TCR_PASSWORD}
+          docker login ${{ env.REGISTRY }} -u ${{ secrets.TCR_USERNAME }} -p ${{ secrets.TCR_PASSWORD }}
           cd ${DEPLOY_PATH}
           docker compose pull
 # #          docker compose up -d --remove-orphans
