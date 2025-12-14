@@ -72,10 +72,10 @@ jobs:
           set -eux
           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
           set -eux
-          export TCR_USERNAME='${{ TCR_USERNAME }}'
-          export TCR_PASSWORD='${{ TCR_PASSWORD }}'
+          export TCR_USERNAME='${{ env.TCR_USERNAME }}'
+          export TCR_PASSWORD='${{ env.TCR_PASSWORD }}'
 
-          docker login ${{ env.REGISTRY }} -u ${{ TCR_USERNAME }} -p ${{ TCR_PASSWORD }}
+          docker login ${{ env.REGISTRY }} -u ${{ secrets.TCR_USERNAME }} -p ${{ secrets.TCR_PASSWORD }}
           cd /opt/quoted-com-insight
           docker compose pull
 # #          docker compose up -d --remove-orphans
