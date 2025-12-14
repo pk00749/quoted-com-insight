@@ -70,9 +70,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${USER}@${HOST} << 'EOF'
           set -eux
 
-          docker login ${{ env.REGISTRY }} -u ${{ secrets.TCR_USERNAME }} -p ${{ secrets.TCR_PASSWORD }}
+          docker login '${{ env.REGISTRY }}' -u '${{ secrets.TCR_USERNAME }}' -p '${{ secrets.TCR_PASSWORD }}'
           cd /opt/quoted-com-insight
           docker compose pull
-# #          docker compose up -d --remove-orphans
-# #          docker image prune -f || true
-#           EOF
+          EOF
