@@ -80,7 +80,7 @@ jobs:
 
           docker login ${REGISTRY} -u ${TCR_USERNAME} -p ${TCR_PASSWORD}
           cd ${DEPLOY_PATH}
-# #          docker compose pull
+          docker compose pull
 # #          docker compose up -d --remove-orphans
 # #          docker image prune -f || true
 #           EOF
