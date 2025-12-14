@@ -135,6 +135,7 @@ async def wechat_message(
             f"To User: {to_user}\n"
             f"Msg ID: {msg_id}\n"
             f"Msg Data ID: {msg_data_id}\n"
+            f"Version: {settings.version}\n"
         )
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
