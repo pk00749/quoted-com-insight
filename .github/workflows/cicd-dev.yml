@@ -64,7 +64,6 @@ jobs:
         env:
           HOST: "203.195.217.95"
           USER: "ubuntu"
-          REGISTRY: ${{ env.REGISTRY }}
           IMAGE: ${{ env.IMAGE }}
           TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
           TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
@@ -75,7 +74,7 @@ jobs:
           export TCR_USERNAME='${{ env.TCR_USERNAME }}'
           export TCR_PASSWORD='${{ env.TCR_PASSWORD }}'
 
-          docker login ${{ env.REGISTRY }} -u ${{ secrets.TCR_USERNAME }} -p ${{ secrets.TCR_PASSWORD }}
+          docker login ${{ env.REGISTRY }} -u ${{ env.TCR_USERNAME }} -p ${{ env.TCR_PASSWORD }}
           cd /opt/quoted-com-insight
           docker compose pull
 # #          docker compose up -d --remove-orphans
