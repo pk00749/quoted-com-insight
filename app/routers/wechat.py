@@ -3,11 +3,6 @@ from typing import Optional
 import hashlib
 import time
 import re
-from collections import defaultdict
-
-# refresh 频控：同一代码刷新间隔秒数
-REFRESH_INTERVAL_SECONDS = 60
-_last_refresh_ts = defaultdict(lambda: 0.0)  # stock_code -> epoch seconds
 import xml.etree.ElementTree as ET
 import logging
 from datetime import datetime
@@ -16,7 +11,6 @@ from zoneinfo import ZoneInfo
 from ..core.config import settings
 from ..services.announcement_service import announcement_service
 from ..services.subscription_service import subscription_service  # 新增：订阅服务
-from .commands import handle_add, handle_del, handle_subscribe, handle_query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -147,60 +141,68 @@ async def wechat_message(
             "1) 发送 6 位股票代码获取近期公告总结\n"
             "2) addXXXXXX 加入订阅 (例 add600000)\n"
             "3) delXXXXXX 取消订阅 (例 del600000)\n"
-            "4) subscribe 查看订阅列表\n"
-            "5) refreshXXXXXX 立即刷新公告总结 (例 refresh600000)"
+            "4) subscribe 查看订阅列表"
         )
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     # subscribe / list / my 查询订阅列表（任务8 + 任务9：带更新时间显示）
     if content.lower() in ("subscribe", "list", "my"):
-        reply = handle_subscribe(from_user)
+        codes = subscription_service.list_codes(from_user)
+        if not codes:
+            reply = "当前未订阅任何股票，发送 add600000 开始订阅"
+        else:
+            # 批量查询更新时间
+            ts_map = subscription_service.get_summary_timestamps(codes)
+            lines = []
+            for sc in codes[:100]:
+                ts = _fmt_utc_iso_to_cst_min(ts_map.get(sc, ""))
+                lines.append(f"{sc} {ts}")
+            reply = "订阅列表(" + str(len(codes)) + "):\n" + "\n".join(lines)
+            if len(codes) > 100:
+                reply += f"\n其余 {len(codes)-100} 个已省略"
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     # 订阅添加
     m_add = re.match(r"^add(\d{6})$", content)
     if m_add:
-        msg = handle_add(from_user, content)
+        code = m_add.group(1)
+        ok, msg = subscription_service.add_code(from_user, code)
         xml = _build_text_reply(from_user, to_user, msg)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     # 订阅删除
     m_del = re.match(r"^del(\d{6})$", content)
     if m_del:
-        msg = handle_del(from_user, content)
+        code = m_del.group(1)
+        ok, msg = subscription_service.del_code(from_user, code)
         xml = _build_text_reply(from_user, to_user, msg)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
-    # refresh 命令：即时刷新指定股票公告总结（^refresh\d{6}$）
-    m_refresh = re.match(r"^refresh(\d{6})$", content)
-    if m_refresh:
-        code = m_refresh.group(1)
-        now_sec = time.time()
-        last_ts = _last_refresh_ts[code]
-        if now_sec - last_ts < REFRESH_INTERVAL_SECONDS:
-            remain = int(REFRESH_INTERVAL_SECONDS - (now_sec - last_ts))
-            reply = f"{code} 刷新过于频繁，请 {remain}s 后再试"
-            xml = _build_text_reply(from_user, to_user, reply)
-            return Response(content=xml, media_type="application/xml; charset=utf-8")
-        try:
-            result = await announcement_service.summarize_announcements(code)
-            subscription_service.save_summary(code, result)
-            _last_refresh_ts[code] = now_sec
-            # 根据提案更新：不直接返回总结内容，仅返回已刷新提示 + 北京时间
-            refreshed_at = datetime.fromtimestamp(now_sec, tz=ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M")
-            reply = f"{code} 已刷新，{refreshed_at}"  # 仍然后台保存内容供后续查询
-        except Exception as ex:
-            reply = f"刷新失败: {ex}"[:1800]
-        xml = _build_text_reply(from_user, to_user, reply)
-        return Response(content=xml, media_type="application/xml; charset=utf-8")
-
-    # 直接查询股票代码（模块化处理）
-    q = handle_query(from_user, content)
-    if q is None:
+    # 直接查询股票代码
+    m = re.search(r"\b(\d{6})\b", content)
+    if not m:
         xml = _build_text_reply(from_user, to_user, "请输入6位A股代码，如 000001")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
-    xml = _build_text_reply(from_user, to_user, q[:1800])
+
+    stock_code = m.group(1)
+
+    # 优先读取缓存
+    cached = subscription_service.load_summary_text(stock_code)
+    if cached:
+        xml = _build_text_reply(from_user, to_user, cached[:1800])  # 控制长度
+        return Response(content=xml, media_type="application/xml; charset=utf-8")
+
+    # 缓存无则实时生成
+    try:
+        result = await announcement_service.summarize_announcements(stock_code)
+        subscription_service.save_summary(stock_code, result)
+        subscription_service.touch(from_user)
+        final_text = result.get("content") or result.get("summary") or "生成总结失败"
+    except Exception as ex:
+        final_text = f"服务暂不可用：{ex}"
+
+    xml = _build_text_reply(from_user, to_user, final_text[:1800])
     logger.info("Reply XML: %s", xml)
     return Response(content=xml, media_type="application/xml; charset=utf-8")
