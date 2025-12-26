@@ -1,0 +1,25 @@
+# VCS & editor
+.git
+.gitignore
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tests & docs
+tests/
+documents/
+openspec/
+
+# Local data & caches
+data/summaries/
+certs/
+
+# CI artifacts
+.github/
+
+# Node/Playwright cache paths (not needed in build context)
+node_modules/
