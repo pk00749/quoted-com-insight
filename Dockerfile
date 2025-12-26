@@ -34,8 +34,10 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # 复制并安装Python依赖（预下载 wheels 离线安装，prefer-binary；在 venv 中执行）
 COPY requirements.txt .
-RUN set -eux \
-    && pip install --no-cache-dir -r requirements.txt \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    set -eux \
+    && pip install --no-cache-dir --only-binary=:all: --no-binary=jsonpath -r requirements.txt \
+    && pip uninstall -y pip setuptools wheel \
     && python -m playwright install chromium \
     && mkdir -p /ms-playwright \
     && sed -i 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/' /etc/locale.gen \
@@ -60,7 +62,7 @@ RUN set -eux; \
     && sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl ca-certificates locales tzdata python3 fonts-noto-cjk \
+        curl ca-certificates locales tzdata python3 \
         libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
         libasound2t64 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0 libdrm2 libxkbcommon0 \
         libxshmfence1 libxfixes3 libxext6 libxi6 libxtst6 libglib2.0-0 libx11-6 libx11-xcb1 libxcb1 libxss1 \
@@ -70,7 +72,8 @@ RUN set -eux; \
     && locale-gen
 
 # 创建非root用户（提前创建以便 COPY --chown 使用）
-RUN useradd -m -s /bin/bash appuser
+RUN useradd -m -s /bin/bash appuser && \
+    chown appuser:appuser /app
 
 # Copy venv and browsers from builder
 ENV VIRTUAL_ENV=/opt/venv
@@ -79,8 +82,6 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /ms-playwright /ms-playwright
 # 仅为应用目录设置归属，避免对庞大的浏览器目录进行递归 chown
 COPY --from=builder --chown=appuser:appuser /app/app /app/app
-# 赋权 /app 根目录，便于运行时创建 data/ 等子目录
-RUN chown appuser:appuser /app
 
 USER appuser
 
