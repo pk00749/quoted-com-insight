@@ -1,7 +1,7 @@
 from typing import List
+
 from app.services.subscription_service import subscription_service
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from .utils import fmt_utc_iso_to_cst_min
 
 
 def handle_subscribe(from_user: str) -> str:
@@ -12,15 +12,8 @@ def handle_subscribe(from_user: str) -> str:
     lines = []
     for sc in codes[:100]:
         ts = ts_map.get(sc, "") or ""
-        if ts.endswith("Z"):
-            ts = ts.replace("Z", "+00:00")
-        try:
-            dt = datetime.fromisoformat(ts)
-            if not dt.tzinfo:
-                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-            cst = dt.astimezone(ZoneInfo("Asia/Shanghai"))
-            ts_fmt = cst.strftime("%Y-%m-%d %H:%M")
-        except Exception:
+        ts_fmt = fmt_utc_iso_to_cst_min(ts)
+        if not ts_fmt:
             ts_fmt = "尚未刷新"
         lines.append(f"{sc} {ts_fmt}")
     reply = "订阅列表(" + str(len(codes)) + "):\n" + "\n".join(lines)
