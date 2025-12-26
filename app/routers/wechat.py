@@ -68,18 +68,15 @@ def _fmt_utc_iso_to_cst_min(ts: str) -> str:
     """将UTC ISO时间转换为北京时间 YYYY-MM-DD HH:MM；若无效返回“尚未刷新”。"""
     if not ts:
         return "尚未刷新"
-    try:
-        # 兼容以Z结尾
-        if ts.endswith("Z"):
-            ts = ts.replace("Z", "+00:00")
-        dt = datetime.fromisoformat(ts)
-        if not dt.tzinfo:
-            # 视为UTC
-            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-        cst = dt.astimezone(ZoneInfo("Asia/Shanghai"))
-        return cst.strftime("%Y-%m-%d %H:%M")
-    except Exception:
-        return "尚未刷新"
+    # 兼容以Z结尾
+    if ts.endswith("Z"):
+        ts = ts.replace("Z", "+00:00")
+    dt = datetime.fromisoformat(ts)
+    if not dt.tzinfo:
+        # 视为UTC
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    cst = dt.astimezone(ZoneInfo("Asia/Shanghai"))
+    return cst.strftime("%Y-%m-%d %H:%M")
 
 
 @router.get("/wechat/callback")
@@ -145,10 +142,10 @@ async def wechat_message(
         reply = (
             "使用说明:\n"
             "1) 发送 6 位股票代码获取近期公告总结\n"
-            "2) addXXXXXX 加入订阅 (例 add600000)\n"
-            "3) delXXXXXX 取消订阅 (例 del600000)\n"
+            "2) addXXX 加入订阅 (例 add600000)\n"
+            "3) delXXX 取消订阅 (例 del600000)\n"
             "4) subscribe 查看订阅列表\n"
-            "5) refreshXXXXXX 立即刷新公告总结 (例 refresh600000)"
+            "5) refreshXXX 立即刷新公告总结 (例 refresh600000)"
         )
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
