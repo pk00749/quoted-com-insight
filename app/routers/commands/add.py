@@ -1,5 +1,5 @@
 import re
-from ..services.subscription_service import subscription_service
+from app.services.subscription_service import subscription_service
 
 ADD_PATTERN = re.compile(r"^add(\d{6})$")
 

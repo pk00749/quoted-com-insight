@@ -1,5 +1,5 @@
 from typing import List
-from ..services.subscription_service import subscription_service
+from app.services.subscription_service import subscription_service
 from datetime import datetime
 from zoneinfo import ZoneInfo
 

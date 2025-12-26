@@ -1,5 +1,5 @@
 import re
-from ..services.subscription_service import subscription_service
+from app.services.subscription_service import subscription_service
 
 DEL_PATTERN = re.compile(r"^del(\d{6})$")
 

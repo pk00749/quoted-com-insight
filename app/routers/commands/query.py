@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from ..services.announcement_service import announcement_service
+from app.services.announcement_service import announcement_service
 
 
 _QUERY_RE = re.compile(r"^(\d{6})$")
