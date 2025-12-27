@@ -7,8 +7,8 @@
 - [x] 1.6 Update config doc entries for log level/path
 
 ## 2. Validation
-- [ ] 2.1 Local run: verify app.log created under /opt/quoted-com-insight/logs with rotated chunks and contains startup + sample API calls
-- [ ] 2.2 Container run: with volume mount to /opt/quoted-com-insight/logs, tail logs from host and confirm entries for announcements + WeChat + scheduler
+- [x] 2.1 Local run: verify app.log created under /opt/quoted-com-insight/logs with rotated chunks and contains startup + sample API calls
+- [x] 2.2 Container run: with volume mount to /opt/quoted-com-insight/logs, tail logs from host and confirm entries for announcements + WeChat + scheduler
 - [ ] 2.3 Unit/functional: add or update tests to assert log hooks or use caplog where feasible
 
 ## 3. Rollback
