@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # 日志配置
     log_level: str = "INFO"
-    log_path: str = "/app/logs/app.log"
+    log_path: str = "/app/app/logs/app.log"
 
     # 微信回调配置
     wechat_token: str = ""  # 微信服务器签名校验用 Token
