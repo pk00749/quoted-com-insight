@@ -16,5 +16,3 @@ System SHALL delegate each supported command to isolated handler modules.
 #### Scenario: Add command module
 - **WHEN** user sends addXXXXXX
 - **THEN** dispatcher invokes add handler returning result
-
-

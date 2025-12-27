@@ -13,7 +13,7 @@ risk_level: medium
 # Change: 微信命令模块化与离线单测
 
 ## Why
-当前 wechat.py 耦合过重且测试需依赖外部服务，需拆分提升可维护与测试速���。
+当前 wechat.py 耦合过重且测试需依赖外部服务，需拆分提升可维护与测试速度。解耦命令逻辑并实现离线可测试性
 
 ## What Changes
 - 拆分命令处理为独立模块 (add/del/subscribe/query)
