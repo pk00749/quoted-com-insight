@@ -64,10 +64,19 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.ID_RSA }}
+      - name: Sync docker-compose.yml to remote
+        env:
+          HOST: "203.195.217.95"
+          USER: "ubuntu"
+        run: |
+          set -eux
+          scp -o StrictHostKeyChecking=no docker-compose.yml ${USER}@${HOST}:/opt/quoted-com-insight/docker-compose.yml
       - name: Deploy over SSH
         env:
           HOST: "203.195.217.95"
