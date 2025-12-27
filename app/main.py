@@ -13,9 +13,10 @@ from app.core.exceptions import create_exception_handler
 from app.services.subscription_service import subscription_service
 from app.services.announcement_service import announcement_service
 from app.core.config import settings  # 新增：引入配置，用于定时任务时间
+from app.core.logging_config import configure_logging
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
+# 配置日志（控制台 + 旋转文件，目录不存在时自动创建）
+configure_logging(settings.log_level, settings.log_path)
 logger = logging.getLogger(__name__)
 
 
@@ -38,14 +39,20 @@ async def _run_daily_summaries_loop():
     # 首次等待至下一个配置的时间
     try:
         delay = await _seconds_until_next_config_time()
-        logger.info(f"定时任务将在 {delay:.0f}s 后(北京时间 {settings.subscription_refresh_time})运行")
+        logger.info(
+            "定时任务初始化，首次执行延迟",
+            extra={"delay_seconds": round(delay), "target_time": settings.subscription_refresh_time},
+        )
         await asyncio.sleep(delay)
     except Exception as e:
         logger.warning(f"计算首次定时延迟失败: {e}")
 
     while True:
         try:
-            logger.info(f"开始执行定时任务({settings.subscription_refresh_time})：汇总订阅股票公告")
+            logger.info(
+                "开始执行定时任务：汇总订阅股票公告",
+                extra={"target_time": settings.subscription_refresh_time},
+            )
             rows = subscription_service.all_rows()
             total_codes = 0
             for _, codes in rows:
@@ -56,13 +63,16 @@ async def _run_daily_summaries_loop():
                         total_codes += 1
                     except Exception as ex:
                         logger.error(f"生成 {code} 公告总结失败: {ex}")
-            logger.info(f"定时任务完成，更新 {total_codes} 个股票的JSON缓存")
+            logger.info("定时任务完成", extra={"updated_codes": total_codes})
         except Exception as e:
             logger.exception(f"定时任务运行异常: {e}")
         # 等待到下一个配置时间
         try:
             delay = await _seconds_until_next_config_time()
-            logger.info(f"下次定时任务将在 {delay:.0f}s 后(北京时间 {settings.subscription_refresh_time})运行")
+            logger.info(
+                "下次定时任务时间已计算",
+                extra={"delay_seconds": round(delay), "target_time": settings.subscription_refresh_time},
+            )
             await asyncio.sleep(delay)
         except Exception as e:
             logger.warning(f"计算下次定时延迟失败: {e}，回退为24小时")
@@ -72,12 +82,14 @@ async def _run_daily_summaries_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动后台定时任务
+    logger.info("应用启动，创建定时任务")
     task = asyncio.create_task(_run_daily_summaries_loop())
     app.state.daily_task = task
     try:
         yield
     finally:
         # 优雅关闭后台任务
+        logger.info("应用停止，取消定时任务")
         task.cancel()
         try:
             await task

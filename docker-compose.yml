@@ -13,6 +13,7 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=8000
       - LOG_LEVEL=INFO
+      - LOG_PATH=/app/logs/app.log
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - WECHAT_TOKEN=${WECHAT_TOKEN}
     volumes:

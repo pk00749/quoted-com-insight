@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import hashlib as _hashlib
 
 from ..core.config import settings
 from ..services.announcement_service import announcement_service
@@ -20,6 +21,13 @@ from .commands import handle_add, handle_del, handle_subscribe, handle_query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _user_fingerprint(user: str) -> str:
+    """生成短指纹，避免记录完整用户标识。"""
+    if not user:
+        return "unknown"
+    return _hashlib.sha1(user.encode("utf-8")).hexdigest()[:8]
 
 
 def _sign(token: str, timestamp: str, nonce: str) -> str:
@@ -88,7 +96,9 @@ async def wechat_verify(
 ):
     """用于微信公众号服务器接入校验（GET）。验证成功后原样返回 echostr。"""
     if not _verify(signature, timestamp, nonce):
+        logger.warning("微信签名校验失败", extra={"signature": signature, "timestamp": timestamp, "nonce": nonce})
         raise HTTPException(status_code=403, detail="签名校验失败")
+    logger.info("微信接入校验成功", extra={"timestamp": timestamp, "nonce": nonce})
     return Response(content=echostr, media_type="text/plain; charset=utf-8")
 
 
@@ -104,6 +114,7 @@ async def wechat_message(
     """接收微信公众号文本消息（POST），仅处理明文模式；安全模式预留。"""
     # 1) 校验 URL 签名
     if not _verify(signature, timestamp, nonce):
+        logger.warning("微信签名校验失败", extra={"signature": signature, "timestamp": timestamp, "nonce": nonce})
         raise HTTPException(status_code=403, detail="签名校验失败")
 
     # 2) 仅实现明文模式，安全/兼容模式解密留待后续
@@ -122,10 +133,15 @@ async def wechat_message(
     msg_data_id = data.get("MsgDataId") or ""
 
     if msg_type.lower() != "text":
+        logger.info(
+            "微信消息类型不支持",
+            extra={"user": _user_fingerprint(from_user), "msg_type": msg_type},
+        )
         xml = _build_text_reply(from_user, to_user, "暂仅支持文本消息，请发送6位A股代码，如 000001")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     if content == "admin":
+        logger.info("微信 admin 命令", extra={"user": _user_fingerprint(from_user)})
         reply = (
             f"Event：{event}\n"
             f"From User: {from_user}\n"
@@ -139,6 +155,7 @@ async def wechat_message(
 
     # 帮助
     if content == "帮助" or content == "help":
+        logger.info("微信帮助命令", extra={"user": _user_fingerprint(from_user)})
         reply = (
             "使用说明:\n"
             "1) 发送 6 位股票代码获取近期公告总结\n"
@@ -152,6 +169,7 @@ async def wechat_message(
 
     # subscribe / list / my 查询订阅列表（任务8 + 任务9：带更新时间显示）
     if content.lower() in ("subscribe", "list", "my"):
+        logger.info("微信订阅列表查询", extra={"user": _user_fingerprint(from_user)})
         reply = handle_subscribe(from_user)
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
@@ -159,6 +177,8 @@ async def wechat_message(
     # 订阅添加
     m_add = re.match(r"^add(\d{6})$", content)
     if m_add:
+        code = m_add.group(1)
+        logger.info("微信添加订阅", extra={"user": _user_fingerprint(from_user), "code": code})
         msg = handle_add(from_user, content)
         xml = _build_text_reply(from_user, to_user, msg)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
@@ -166,6 +186,8 @@ async def wechat_message(
     # 订阅删除
     m_del = re.match(r"^del(\d{6})$", content)
     if m_del:
+        code = m_del.group(1)
+        logger.info("微信删除订阅", extra={"user": _user_fingerprint(from_user), "code": code})
         msg = handle_del(from_user, content)
         xml = _build_text_reply(from_user, to_user, msg)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
@@ -178,10 +200,15 @@ async def wechat_message(
         last_ts = _last_refresh_ts[code]
         if now_sec - last_ts < REFRESH_INTERVAL_SECONDS:
             remain = int(REFRESH_INTERVAL_SECONDS - (now_sec - last_ts))
+            logger.info(
+                "微信刷新限流",
+                extra={"user": _user_fingerprint(from_user), "code": code, "remain_seconds": remain},
+            )
             reply = f"{code} 刷新过于频繁，请 {remain}s 后再试"
             xml = _build_text_reply(from_user, to_user, reply)
             return Response(content=xml, media_type="application/xml; charset=utf-8")
         try:
+            logger.info("微信刷新开始", extra={"user": _user_fingerprint(from_user), "code": code})
             result = await announcement_service.summarize_announcements(code)
             subscription_service.save_summary(code, result)
             _last_refresh_ts[code] = now_sec
@@ -189,6 +216,7 @@ async def wechat_message(
             refreshed_at = datetime.fromtimestamp(now_sec, tz=ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M")
             reply = f"{code} 已刷新，{refreshed_at}"  # 仍然后台保存内容供后续查询
         except Exception as ex:
+            logger.exception("微信刷新失败", extra={"user": _user_fingerprint(from_user), "code": code})
             reply = f"刷新失败: {ex}"[:1800]
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
@@ -196,8 +224,9 @@ async def wechat_message(
     # 直接查询股票代码（模块化处理）
     q = handle_query(from_user, content)
     if q is None:
+        logger.info("微信无效代码输入", extra={"user": _user_fingerprint(from_user), "content_len": len(content)})
         xml = _build_text_reply(from_user, to_user, "请输入6位A股代码，如 000001")
         return Response(content=xml, media_type="application/xml; charset=utf-8")
     xml = _build_text_reply(from_user, to_user, q[:1800])
-    logger.info("Reply XML: %s", xml)
+    logger.info("微信查询完成", extra={"user": _user_fingerprint(from_user), "content_len": len(content)})
     return Response(content=xml, media_type="application/xml; charset=utf-8")

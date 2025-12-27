@@ -30,17 +30,27 @@ class AnnouncementService:
         """获取单个股票过去N天（可配置）的公告列表"""
         try:
             days = max(1, int(settings.announcement_time_range_days))
-            logger.info(f"获取股票公告: {stock_code}, 时间范围: 过去{days}天")
+            logger.info(
+                "开始获取股票公告",
+                extra={"stock_code": stock_code, "days": days},
+            )
 
             # 使用akshare获取过去N天的公告数据 - 在线程池中执行同步操作
             loop = asyncio.get_event_loop()
             all_announcements = await loop.run_in_executor(None, self._get_range_announcements, stock_code, days)
             if not all_announcements:
+                logger.info(
+                    "公告为空",
+                    extra={"stock_code": stock_code, "days": days},
+                )
                 return AnnouncementList(announcements=[], total=0, page=1, size=20)
 
             # 去重处理（基于URL和标题）
             unique_announcements = self._remove_duplicates(all_announcements)
-            logger.info(f"成功获取并去重后公告数据: {len(unique_announcements)} 条")
+            logger.info(
+                "公告获取成功",
+                extra={"stock_code": stock_code, "unique_count": len(unique_announcements), "raw_count": len(all_announcements)},
+            )
 
             return AnnouncementList(
                 announcements=unique_announcements,
@@ -152,6 +162,10 @@ class AnnouncementService:
             announcement_list = await self.get_announcements(stock_code)
             announcements = announcement_list.announcements
             if not announcements:
+                logger.info(
+                    "公告为空，返回默认总结",
+                    extra={"stock_code": stock_code, "days": settings.announcement_time_range_days},
+                )
                 return {
                     "summary": f"股票{stock_code}近{settings.announcement_time_range_days}天无公告",
                     "content": "",
@@ -172,7 +186,7 @@ class AnnouncementService:
 
             # 3. 预留LLM调用接口，单条总结与最终汇总
             final_summary = llm_by_api(single_summary)
-            logger.info(final_summary)
+            logger.info("公告总结完成", extra={"stock_code": stock_code, "word_count": len(final_summary)})
             return {
                 "summary": f"针对股票：{stock_code}的公告总结",
                 "content": final_summary,
@@ -190,6 +204,7 @@ class AnnouncementService:
     async def _extract_announcement_content(self, url: str) -> str:
         """提取公告正文内容，优先从PDF中获取"""
         try:
+            logger.info("提取公告正文", extra={"url": url})
             async with async_playwright() as p:
                 browser = await p.chromium.launch()
                 page = await browser.new_page()

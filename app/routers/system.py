@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter
 from datetime import datetime
 
@@ -5,6 +6,7 @@ from ..models import BaseResponse
 from ..core.config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/health", response_model=BaseResponse)
 async def health_check():
@@ -12,6 +14,8 @@ async def health_check():
     try:
         # 检查akshare连接状态
         akshare_status = "healthy"
+
+        logger.info("健康检查", extra={"status": "healthy", "service": settings.app_name, "version": settings.version})
 
         return BaseResponse(
             data={
@@ -25,6 +29,7 @@ async def health_check():
             message="服务运行正常，可供n8n调用"
         )
     except Exception as e:
+        logger.exception("健康检查异常")
         return BaseResponse(
             data={
                 "status": "error",
@@ -37,6 +42,7 @@ async def health_check():
 @router.get("/version", response_model=BaseResponse)
 async def get_version():
     """获取版本信息"""
+    logger.info("查询版本信息", extra={"version": settings.version})
     return BaseResponse(
         data={
             "version": settings.version,

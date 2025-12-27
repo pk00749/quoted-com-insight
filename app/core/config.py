@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # 日志配置
     log_level: str = "INFO"
+    log_path: str = "/app/logs/app.log"
 
     # 微信回调配置
     wechat_token: str = ""  # 微信服务器签名校验用 Token
@@ -78,3 +79,7 @@ if _yaml:
     # 若不合法保持默认并可打印警告
     else:
         print(f"Invalid subscription_refresh_time '{val}', use default {settings.subscription_refresh_time}")
+
+    # 日志配置（可由 YAML 覆盖缺省）
+    settings.log_level = str(_yaml.get("log_level", settings.log_level)).upper()
+    settings.log_path = str(_yaml.get("log_path", settings.log_path))
