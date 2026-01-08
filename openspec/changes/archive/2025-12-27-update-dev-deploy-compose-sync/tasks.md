@@ -4,8 +4,8 @@
 - [x] 1.3 Keep existing deploy flow intact (login, pull, up, prune)
 
 ## 2. Validation
-- [ ] 2.1 Run `openspec validate update-dev-deploy-compose-sync --strict`
-- [ ] 2.2 Dry-run or review workflow syntax for correctness
+- [x] 2.1 Run `openspec validate update-dev-deploy-compose-sync --strict`
+- [x] 2.2 Dry-run or review workflow syntax for correctness
 
 ## 3. Rollback
 - [ ] 3.1 Revert workflow step and rely on remote copy if sync causes issues
