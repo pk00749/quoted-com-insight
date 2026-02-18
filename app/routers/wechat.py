@@ -3,21 +3,13 @@ from typing import Optional
 import hashlib
 import time
 import re
-from collections import defaultdict
-
-# refresh 频控：同一代码刷新间隔秒数
-REFRESH_INTERVAL_SECONDS = 60
-_last_refresh_ts = defaultdict(lambda: 0.0)  # stock_code -> epoch seconds
 import xml.etree.ElementTree as ET
 import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
 import hashlib as _hashlib
 
 from ..core.config import settings
 from ..services.announcement_service import announcement_service
-from ..services.subscription_service import subscription_service  # 新增：订阅服务
-from .commands import handle_add, handle_del, handle_subscribe, handle_query
+from .commands import handle_query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -70,21 +62,6 @@ def _build_text_reply(to_user: str, from_user: str, content: str) -> str:
         f"  <Content><![CDATA[{content}]]></Content>\n"
         f"</xml>"
     )
-
-
-def _fmt_utc_iso_to_cst_min(ts: str) -> str:
-    """将UTC ISO时间转换为北京时间 YYYY-MM-DD HH:MM；若无效返回“尚未刷新”。"""
-    if not ts:
-        return "尚未刷新"
-    # 兼容以Z结尾
-    if ts.endswith("Z"):
-        ts = ts.replace("Z", "+00:00")
-    dt = datetime.fromisoformat(ts)
-    if not dt.tzinfo:
-        # 视为UTC
-        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-    cst = dt.astimezone(ZoneInfo("Asia/Shanghai"))
-    return cst.strftime("%Y-%m-%d %H:%M")
 
 
 @router.get("/wechat/callback")
@@ -156,73 +133,12 @@ async def wechat_message(
     # 帮助
     if content == "帮助" or content == "help":
         logger.info("微信帮助命令", extra={"user": _user_fingerprint(from_user)})
-        reply = (
-            "使用说明:\n"
-            "1) 发送 6 位股票代码获取近期公告总结\n"
-            "2) addXXX 加入订阅 (例 add600000)\n"
-            "3) delXXX 取消订阅 (例 del600000)\n"
-            "4) subscribe 查看订阅列表\n"
-            "5) refreshXXX 立即刷新公告总结 (例 refresh600000)"
-        )
-        xml = _build_text_reply(from_user, to_user, reply)
-        return Response(content=xml, media_type="application/xml; charset=utf-8")
-
-    # subscribe / list / my 查询订阅列表（任务8 + 任务9：带更新时间显示）
-    if content.lower() in ("subscribe", "list", "my"):
-        logger.info("微信订阅列表查询", extra={"user": _user_fingerprint(from_user)})
-        reply = handle_subscribe(from_user)
-        xml = _build_text_reply(from_user, to_user, reply)
-        return Response(content=xml, media_type="application/xml; charset=utf-8")
-
-    # 订阅添加
-    m_add = re.match(r"^add(\d{6})$", content)
-    if m_add:
-        code = m_add.group(1)
-        logger.info("微信添加订阅", extra={"user": _user_fingerprint(from_user), "code": code})
-        msg = handle_add(from_user, content)
-        xml = _build_text_reply(from_user, to_user, msg)
-        return Response(content=xml, media_type="application/xml; charset=utf-8")
-
-    # 订阅删除
-    m_del = re.match(r"^del(\d{6})$", content)
-    if m_del:
-        code = m_del.group(1)
-        logger.info("微信删除订阅", extra={"user": _user_fingerprint(from_user), "code": code})
-        msg = handle_del(from_user, content)
-        xml = _build_text_reply(from_user, to_user, msg)
-        return Response(content=xml, media_type="application/xml; charset=utf-8")
-
-    # refresh 命令：即时刷新指定股票公告总结（^refresh\d{6}$）
-    m_refresh = re.match(r"^refresh(\d{6})$", content)
-    if m_refresh:
-        code = m_refresh.group(1)
-        now_sec = time.time()
-        last_ts = _last_refresh_ts[code]
-        if now_sec - last_ts < REFRESH_INTERVAL_SECONDS:
-            remain = int(REFRESH_INTERVAL_SECONDS - (now_sec - last_ts))
-            logger.info(
-                "微信刷新限流",
-                extra={"user": _user_fingerprint(from_user), "code": code, "remain_seconds": remain},
-            )
-            reply = f"{code} 刷新过于频繁，请 {remain}s 后再试"
-            xml = _build_text_reply(from_user, to_user, reply)
-            return Response(content=xml, media_type="application/xml; charset=utf-8")
-        try:
-            logger.info("微信刷新开始", extra={"user": _user_fingerprint(from_user), "code": code})
-            result = await announcement_service.summarize_announcements(code)
-            subscription_service.save_summary(code, result)
-            _last_refresh_ts[code] = now_sec
-            # 根据提案更新：不直接返回总结内容，仅返回已刷新提示 + 北京时间
-            refreshed_at = datetime.fromtimestamp(now_sec, tz=ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M")
-            reply = f"{code} 已刷新，{refreshed_at}"  # 仍然后台保存内容供后续查询
-        except Exception as ex:
-            logger.exception("微信刷新失败", extra={"user": _user_fingerprint(from_user), "code": code})
-            reply = f"刷新失败: {ex}"[:1800]
+        reply = "发送 6 位股票代码获取近期公告总结，如 000001"
         xml = _build_text_reply(from_user, to_user, reply)
         return Response(content=xml, media_type="application/xml; charset=utf-8")
 
     # 直接查询股票代码（模块化处理）
-    q = handle_query(from_user, content)
+    q = await handle_query(from_user, content)
     if q is None:
         logger.info("微信无效代码输入", extra={"user": _user_fingerprint(from_user), "content_len": len(content)})
         xml = _build_text_reply(from_user, to_user, "请输入6位A股代码，如 000001")

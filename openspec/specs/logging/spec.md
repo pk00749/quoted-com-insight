@@ -15,17 +15,13 @@ System SHALL emit application logs to both stdout and a file under /opt/quoted-c
 - **THEN** log verbosity follows that level for both console and file sinks
 
 ### Requirement: Operational logging coverage
-System SHALL record contextual logs for key operations covering announcements, WeChat commands, and schedulers.
+System SHALL record contextual logs for key operations covering announcements and WeChat commands.
 
 #### Scenario: Announcements fetch and summarize
 - **WHEN** fetching or summarizing announcements for a stock code
 - **THEN** the system logs the code, time window, counts of announcements, and any per-code errors or summarize failures
 
 #### Scenario: WeChat command handling
-- **WHEN** processing a WeChat command (add/del/subscribe/query/refresh)
+- **WHEN** processing a WeChat command (query/help)
 - **THEN** the system logs sanitized user identifier, command type, parameters, and errors without leaking sensitive message content
-
-#### Scenario: Scheduler lifecycle
-- **WHEN** the daily refresh scheduler starts, runs, or fails
-- **THEN** the system logs the scheduled time, next-run delay, execution start/finish, and exceptions with stack traces
 

@@ -276,7 +276,7 @@ uvicorn app.main:app --reload
 pytest
 
 # 运行特定测试
-pytest tests/test_akshare_api.py
+pytest tests/taste_akshare_api.py
 ```
 
 ## 📝 更新日志
